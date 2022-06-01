@@ -1,0 +1,24 @@
+{
+  "name": "store",
+  "description": "terragrids api layer to access no-sql storage",
+  "private": true,
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "jest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/terragrids/store.git"
+  },
+  "bugs": {
+    "url": "https://github.com/terragrids/store/issues"
+  },
+  "homepage": "https://github.com/terragrids/store#readme",
+  "dependencies": {
+    "@koa/router": "^10.1.1",
+    "koa": "^2.13.4",
+    "koa-bodyparser": "^4.3.0"
+  }
+}
