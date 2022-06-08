@@ -6,7 +6,7 @@ describe('app', function () {
         it('should return 200 when calling root path', async () => {
             const response = await request(app.callback()).get('/')
             expect(response.status).toBe(200)
-            expect(response.text).toBe('terragrids store')
+            expect(response.text).toBe('terragrids api')
         })
     })
 })
