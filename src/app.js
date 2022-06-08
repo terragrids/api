@@ -7,7 +7,7 @@ export const app = new Koa()
 const router = new Router()
 
 router.get('/', (ctx) => {
-    ctx.body = 'terragrids store'
+    ctx.body = 'terragrids api'
 })
 
 app
