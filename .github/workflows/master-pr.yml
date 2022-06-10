@@ -29,3 +29,6 @@ jobs:
           npm install
           npm test
           npm run lint
+        env:
+          ENV: dev
+          AWS_REGION: local
