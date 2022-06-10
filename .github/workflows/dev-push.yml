@@ -29,6 +29,9 @@ jobs:
           npm install
           npm test
           npm run lint
+        env:
+          ENV: dev
+          AWS_REGION: local
 
       - name: Create Zip File
         uses: montudor/action-zip@v1
