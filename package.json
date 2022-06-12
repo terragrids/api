@@ -19,6 +19,7 @@
   "homepage": "https://github.com/terragrids/store#readme",
   "dependencies": {
     "@koa/router": "^10.1.1",
+    "dotenv": "^16.0.1",
     "koa": "^2.13.4",
     "koa-bodyparser": "^4.3.0",
     "serverless-http": "^3.0.1"
