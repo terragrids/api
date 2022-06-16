@@ -13,7 +13,10 @@ function algonodeIndexerEndpoint(path) {
 export default class AlgoIndexer {
     async callRandLabsIndexerEndpoint(path) {
         const response = await fetch(randLabsIndexerEndpoint(path))
-        return await response.json()
+        return {
+            status: response.status,
+            json: await response.json()
+        }
     }
 
     async callAlgonodeIndexerEndpoint(path) {

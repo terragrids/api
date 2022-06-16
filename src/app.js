@@ -27,7 +27,7 @@ router.get('/hc', (ctx) => {
 router.get('/terracells', async (ctx) => {
     const response = await new AlgoIndexer().callRandLabsIndexerEndpoint('assets?unit=TRCL')
     ctx.body = {
-        assets: response.assets
+        assets: response.json.assets
             .filter(asset => !asset.deleted && asset.params.total === 1 && asset.params.decimals === 0)
             .map(asset => ({
                 id: asset.index,
