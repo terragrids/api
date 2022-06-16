@@ -4,19 +4,12 @@ export default {
     collectCoverageFrom: [
         '**/src/**',
         '!**/src/server*.js',
-        '!**/src/algo-indexer*.js',
+        '!**/src/network/**.js',
         '!**/node_modules/**',
         '!**/build/**',
-        '!**/coverage/**'
+        '!**/coverage/**',
+        '!**/logger.js'
     ],
-    coverageThreshold: {
-        'global': {
-            'branches': 100,
-            'functions': 100,
-            'lines': 100,
-            'statements': 100
-        }
-    },
     coverageReporters: [
         'text',
         'text-summary',

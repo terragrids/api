@@ -4,7 +4,7 @@ import request from 'supertest'
 const mockAlgoIndexer = {
     callRandLabsIndexerEndpoint: jest.fn().mockImplementation(() => jest.fn())
 }
-jest.mock('./algo-indexer.js', () => jest.fn().mockImplementation(() => ({
+jest.mock('./network/algo-indexer.js', () => jest.fn().mockImplementation(() => ({
     callRandLabsIndexerEndpoint: mockAlgoIndexer.callRandLabsIndexerEndpoint
 })))
 
