@@ -58,7 +58,7 @@ router.get('/terracells/:assetId', async (ctx) => {
                 symbol: asset.params['unit-name'],
                 url: asset.params.url,
                 holders: balances
-                    .filter(balance => balance.amount > 0)
+                    .filter(balance => balance.amount > 0 && !balance.deleted)
                     .map(balance => ({
                         address: balance.address,
                         amount: balance.amount
