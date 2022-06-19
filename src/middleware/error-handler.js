@@ -8,6 +8,9 @@ export default async function errorHandler(ctx, next) {
     } catch (e) {
         logger.error(e.toString())
         if (e instanceof GenericError) {
+            if (e.error) {
+                logger.error(e.error.message)
+            }
             ctx.status = e.httpCode
             ctx.body = e.toJson()
         } else {
