@@ -69,6 +69,19 @@ router.get('/terracells/:assetId', async (ctx) => {
     }
 })
 
+router.get('/accounts/:accountId/terracells', async (ctx) => {
+    const response = await new AlgoIndexer().callRandLabsIndexerEndpoint(`accounts/${ctx.params.accountId}/assets`)
+    ctx.body = {
+        assets: response.status !== 200 ? [] : response.json.assets
+            .filter(asset => !asset.deleted && asset.amount === 1 && asset.decimals === 0 && asset['unit-name'] === 'TRCL')
+            .map(asset => ({
+                id: asset['asset-id'],
+                name: asset.name,
+                symbol: asset['unit-name']
+            }))
+    }
+})
+
 app
     .use(requestLogger)
     .use(errorHandler)
