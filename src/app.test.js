@@ -1,6 +1,5 @@
 import { app } from './app.js'
 import request from 'supertest'
-import AssetNotFoundError from './error/asset-not-found.error.js'
 
 const mockAlgoIndexer = {
     callRandLabsIndexerEndpoint: jest.fn().mockImplementation(() => jest.fn()),
