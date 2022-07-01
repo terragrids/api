@@ -2,14 +2,16 @@ export default {
     verbose: true,
     collectCoverage: true,
     collectCoverageFrom: [
-        '**/src/**',
-        '!**/src/server*.js',
-        '!**/src/network/**.js',
-        '!**/node_modules/**',
-        '!**/build/**',
-        '!**/coverage/**',
-        '!**/logger.js'
+        '**/src/app.js'
     ],
+    coverageThreshold: {
+        'global': {
+            'branches': 100,
+            'functions': 100,
+            'lines': 100,
+            'statements': 100
+        }
+    },
     coverageReporters: [
         'text',
         'text-summary',

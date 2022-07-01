@@ -11,17 +11,26 @@ jest.mock('./network/algo-indexer.js', () => jest.fn().mockImplementation(() => 
 })))
 
 const mockTokenRepository = {
-    getTokenContract: jest.fn().mockImplementation(() => jest.fn())
+    getTokenContract: jest.fn().mockImplementation(() => jest.fn()),
+    putTokenContract: jest.fn().mockImplementation(() => jest.fn()),
+    deleteTokenContract: jest.fn().mockImplementation(() => jest.fn())
 }
 jest.mock('./repository/token.repository.js', () => jest.fn().mockImplementation(() => ({
-    getTokenContract: mockTokenRepository.getTokenContract
+    getTokenContract: mockTokenRepository.getTokenContract,
+    putTokenContract: mockTokenRepository.putTokenContract,
+    deleteTokenContract: mockTokenRepository.deleteTokenContract
 })))
 
 describe('app', function () {
+    const OLD_ENV = process.env
+
     beforeEach(() => {
-        mockAlgoIndexer.callRandLabsIndexerEndpoint.mockClear()
-        mockAlgoIndexer.callAlgonodeIndexerEndpoint.mockClear()
-        mockTokenRepository.getTokenContract.mockClear()
+        jest.clearAllMocks()
+        process.env = { ...OLD_ENV } // make a copy
+    })
+
+    afterAll(() => {
+        process.env = OLD_ENV // restore old env
     })
 
     describe('get root endpoint', function () {
@@ -308,6 +317,609 @@ describe('app', function () {
             expect(response.body).toEqual({
                 error: 'AssetNotFoundError',
                 message: 'Asset specified not found'
+            })
+        })
+    })
+
+    describe('get account terracells endpoint', function () {
+        it('should return 200 when calling account terracells endpoint and no assets found', async () => {
+            mockAlgoIndexer.callRandLabsIndexerEndpoint.mockImplementation(() => Promise.resolve({
+                status: 404
+            }))
+
+            const response = await request(app.callback()).get('/accounts/123/terracells')
+
+            expect(mockAlgoIndexer.callRandLabsIndexerEndpoint).toHaveBeenCalledTimes(1)
+            expect(mockAlgoIndexer.callRandLabsIndexerEndpoint).toHaveBeenCalledWith('accounts/123/assets')
+
+            expect(response.status).toBe(200)
+            expect(response.body).toEqual({ assets: [] })
+        })
+
+        it('should return 200 when calling account terracells endpoint and assets found', async () => {
+            mockAlgoIndexer.callRandLabsIndexerEndpoint.mockImplementation(() => Promise.resolve({
+                status: 200,
+                json: {
+                    assets: [{
+                        'asset-id': 1,
+                        amount: 1,
+                        decimals: 0,
+                        deleted: false,
+                        'unit-name': 'TRCL',
+                        name: 'Terracell 1'
+                    }, {
+                        'asset-id': 2,
+                        amount: 0,
+                        decimals: 0,
+                        deleted: false,
+                        'unit-name': 'TRCL',
+                        name: 'Terracell 2'
+                    }, {
+                        'asset-id': 3,
+                        amount: 1,
+                        decimals: 0,
+                        deleted: true,
+                        'unit-name': 'TRCL',
+                        name: 'Terracell 3'
+                    }, {
+                        'asset-id': 4,
+                        amount: 2,
+                        decimals: 0,
+                        deleted: false,
+                        'unit-name': 'TRCL',
+                        name: 'Terracell 4'
+                    }, {
+                        'asset-id': 5,
+                        amount: 1,
+                        decimals: 1,
+                        deleted: false,
+                        'unit-name': 'TRCL',
+                        name: 'Terracell 5'
+                    }, {
+                        'asset-id': 6,
+                        amount: 1,
+                        decimals: 0,
+                        deleted: false,
+                        'unit-name': 'meh',
+                        name: 'Terracell 6'
+                    }, {
+                        'asset-id': 7,
+                        amount: 1,
+                        decimals: 0,
+                        deleted: false,
+                        'unit-name': 'TRCL',
+                        name: 'Terracell 7'
+                    }]
+                }
+            }))
+
+            const response = await request(app.callback()).get('/accounts/123/terracells')
+
+            expect(mockAlgoIndexer.callRandLabsIndexerEndpoint).toHaveBeenCalledTimes(1)
+            expect(mockAlgoIndexer.callRandLabsIndexerEndpoint).toHaveBeenCalledWith('accounts/123/assets')
+
+            expect(response.status).toBe(200)
+            expect(response.body).toEqual({
+                assets: [{
+                    id: 1,
+                    name: 'Terracell 1',
+                    symbol: 'TRCL'
+                }, {
+                    id: 7,
+                    name: 'Terracell 7',
+                    symbol: 'TRCL'
+                }]
+            })
+        })
+    })
+
+    describe('post terracell contract endpoint', function () {
+        it('should return 201 when calling terracell contract endpoint and both terracell and application found', async () => {
+            process.env.ALGO_APP_APPROVAL = 'approval_program_value'
+
+            mockAlgoIndexer.callAlgonodeIndexerEndpoint.mockImplementation(params => {
+                switch (params) {
+                    case 'assets/123':
+                        return Promise.resolve({
+                            status: 200,
+                            json: {
+                                asset: {
+                                    index: 123,
+                                    params: {
+                                        name: 'Terracell #1',
+                                        total: 1,
+                                        decimals: 0,
+                                        'unit-name': 'TRCL',
+                                        url: 'https://terragrids.org#1'
+                                    }
+                                }
+                            }
+                        })
+                    case 'applications/456':
+                        return Promise.resolve({
+                            status: 200,
+                            json: {
+                                application: {
+                                    params: {
+                                        'approval-program': 'approval_program_value'
+                                    }
+                                }
+                            }
+                        })
+                }
+            })
+
+            const response = await request(app.callback())
+                .post('/terracells/123/contracts/456')
+                .send({
+                    contractInfo: 'contract_info',
+                    sellerAddress: 'seller_address',
+                    assetPrice: 10,
+                    assetPriceUnit: 'ALGO'
+                })
+
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledTimes(2)
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/123')
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('applications/456')
+
+            expect(mockTokenRepository.putTokenContract).toHaveBeenCalledTimes(1)
+            expect(mockTokenRepository.putTokenContract).toHaveBeenCalledWith({
+                assetId: '123',
+                applicationId: '456',
+                contractInfo: 'contract_info',
+                sellerAddress: 'seller_address',
+                assetPrice: 10,
+                assetPriceUnit: 'ALGO'
+            })
+
+            expect(response.status).toBe(201)
+        })
+
+        it('should return 404 when calling terracell contract endpoint and terracell not found', async () => {
+            process.env.ALGO_APP_APPROVAL = 'approval_program_value'
+
+            mockAlgoIndexer.callAlgonodeIndexerEndpoint.mockImplementation(params => {
+                switch (params) {
+                    case 'assets/123':
+                        return Promise.resolve({
+                            status: 404
+                        })
+                    case 'applications/456':
+                        return Promise.resolve({
+                            status: 200,
+                            json: {
+                                application: {
+                                    params: {
+                                        'approval-program': 'approval_program_value'
+                                    }
+                                }
+                            }
+                        })
+                }
+            })
+
+            const response = await request(app.callback())
+                .post('/terracells/123/contracts/456')
+                .send({
+                    contractInfo: 'contract_info',
+                    sellerAddress: 'seller_address',
+                    assetPrice: 10,
+                    assetPriceUnit: 'ALGO'
+                })
+
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledTimes(2)
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/123')
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('applications/456')
+
+            expect(mockTokenRepository.putTokenContract).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(404)
+        })
+
+        it('should return 404 when calling terracell contract endpoint and asset not terracell', async () => {
+            process.env.ALGO_APP_APPROVAL = 'approval_program_value'
+
+            mockAlgoIndexer.callAlgonodeIndexerEndpoint.mockImplementation(params => {
+                switch (params) {
+                    case 'assets/123':
+                        return Promise.resolve({
+                            status: 200,
+                            json: {
+                                asset: {
+                                    index: 123,
+                                    params: {
+                                        name: 'Terracell #1',
+                                        total: 1,
+                                        decimals: 0,
+                                        'unit-name': 'meh',
+                                        url: 'https://terragrids.org#1'
+                                    }
+                                }
+                            }
+                        })
+                    case 'applications/456':
+                        return Promise.resolve({
+                            status: 200,
+                            json: {
+                                application: {
+                                    params: {
+                                        'approval-program': 'approval_program_value'
+                                    }
+                                }
+                            }
+                        })
+                }
+            })
+
+            const response = await request(app.callback())
+                .post('/terracells/123/contracts/456')
+                .send({
+                    contractInfo: 'contract_info',
+                    sellerAddress: 'seller_address',
+                    assetPrice: 10,
+                    assetPriceUnit: 'ALGO'
+                })
+
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledTimes(2)
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/123')
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('applications/456')
+
+            expect(mockTokenRepository.putTokenContract).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(404)
+        })
+
+        it('should return 404 when calling terracell contract endpoint and application not found', async () => {
+            process.env.ALGO_APP_APPROVAL = 'approval_program_value'
+
+            mockAlgoIndexer.callAlgonodeIndexerEndpoint.mockImplementation(params => {
+                switch (params) {
+                    case 'assets/123':
+                        return Promise.resolve({
+                            status: 200,
+                            json: {
+                                asset: {
+                                    index: 123,
+                                    params: {
+                                        name: 'Terracell #1',
+                                        total: 1,
+                                        decimals: 0,
+                                        'unit-name': 'TRCL',
+                                        url: 'https://terragrids.org#1'
+                                    }
+                                }
+                            }
+                        })
+                    case 'applications/456':
+                        return Promise.resolve({
+                            status: 404
+                        })
+                }
+            })
+
+            const response = await request(app.callback())
+                .post('/terracells/123/contracts/456')
+                .send({
+                    contractInfo: 'contract_info',
+                    sellerAddress: 'seller_address',
+                    assetPrice: 10,
+                    assetPriceUnit: 'ALGO'
+                })
+
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledTimes(2)
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/123')
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('applications/456')
+
+            expect(mockTokenRepository.putTokenContract).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(404)
+        })
+
+        it('should return 404 when calling terracell contract endpoint and application approval program not valid', async () => {
+            process.env.ALGO_APP_APPROVAL = 'approval_program_value'
+
+            mockAlgoIndexer.callAlgonodeIndexerEndpoint.mockImplementation(params => {
+                switch (params) {
+                    case 'assets/123':
+                        return Promise.resolve({
+                            status: 200,
+                            json: {
+                                asset: {
+                                    index: 123,
+                                    params: {
+                                        name: 'Terracell #1',
+                                        total: 1,
+                                        decimals: 0,
+                                        'unit-name': 'TRCL',
+                                        url: 'https://terragrids.org#1'
+                                    }
+                                }
+                            }
+                        })
+                    case 'applications/456':
+                        return Promise.resolve({
+                            status: 200,
+                            json: {
+                                application: {
+                                    params: {
+                                        'approval-program': 'meh'
+                                    }
+                                }
+                            }
+                        })
+                }
+            })
+
+            const response = await request(app.callback())
+                .post('/terracells/123/contracts/456')
+                .send({
+                    contractInfo: 'contract_info',
+                    sellerAddress: 'seller_address',
+                    assetPrice: 10,
+                    assetPriceUnit: 'ALGO'
+                })
+
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledTimes(2)
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/123')
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('applications/456')
+
+            expect(mockTokenRepository.putTokenContract).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(404)
+        })
+
+        it('should return 400 when calling terracell contract endpoint and contract info missing', async () => {
+            const response = await request(app.callback())
+                .post('/terracells/123/contracts/456')
+                .send({
+                    sellerAddress: 'seller_address',
+                    assetPrice: 10,
+                    assetPriceUnit: 'ALGO'
+                })
+
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putTokenContract).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(400)
+            expect(response.body).toEqual({
+                error: 'MissingParameterError',
+                message: 'contractInfo must be specified'
+            })
+        })
+
+        it('should return 400 when calling terracell contract endpoint and seller address missing', async () => {
+            const response = await request(app.callback())
+                .post('/terracells/123/contracts/456')
+                .send({
+                    contractInfo: 'contract_info',
+                    assetPrice: 10,
+                    assetPriceUnit: 'ALGO'
+                })
+
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putTokenContract).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(400)
+            expect(response.body).toEqual({
+                error: 'MissingParameterError',
+                message: 'sellerAddress must be specified'
+            })
+        })
+
+        it('should return 400 when calling terracell contract endpoint and asset price missing', async () => {
+            const response = await request(app.callback())
+                .post('/terracells/123/contracts/456')
+                .send({
+                    contractInfo: 'contract_info',
+                    sellerAddress: 'seller_address',
+                    assetPriceUnit: 'ALGO'
+                })
+
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putTokenContract).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(400)
+            expect(response.body).toEqual({
+                error: 'MissingParameterError',
+                message: 'assetPrice must be specified'
+            })
+        })
+
+        it('should return 400 when calling terracell contract endpoint and asset price unit missing', async () => {
+            const response = await request(app.callback())
+                .post('/terracells/123/contracts/456')
+                .send({
+                    contractInfo: 'contract_info',
+                    sellerAddress: 'seller_address',
+                    assetPrice: 10
+                })
+
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putTokenContract).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(400)
+            expect(response.body).toEqual({
+                error: 'MissingParameterError',
+                message: 'assetPriceUnit must be specified'
+            })
+        })
+
+        it('should return 400 when calling terracell contract endpoint and request body missing', async () => {
+            const response = await request(app.callback())
+                .post('/terracells/123/contracts/456')
+
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putTokenContract).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(400)
+            expect(response.body).toEqual({
+                error: 'MissingParameterError',
+                message: 'contractInfo must be specified'
+            })
+        })
+    })
+
+    describe('delete terracell contract endpoint', function () {
+        it('should return 204 when calling terracell contract endpoint and terracell found and application not running', async () => {
+            mockAlgoIndexer.callAlgonodeIndexerEndpoint.mockImplementation(params => {
+                switch (params) {
+                    case 'assets/123':
+                        return Promise.resolve({
+                            status: 200,
+                            json: {
+                                asset: {
+                                    index: 123,
+                                    params: {
+                                        name: 'Terracell #1',
+                                        total: 1,
+                                        decimals: 0,
+                                        'unit-name': 'TRCL',
+                                        url: 'https://terragrids.org#1'
+                                    }
+                                }
+                            }
+                        })
+                    case 'applications/456':
+                        return Promise.resolve({
+                            status: 404
+                        })
+                }
+            })
+
+            const response = await request(app.callback()).delete('/terracells/123/contracts/456')
+
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledTimes(2)
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/123')
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('applications/456')
+
+            expect(mockTokenRepository.deleteTokenContract).toHaveBeenCalledTimes(1)
+            expect(mockTokenRepository.deleteTokenContract).toHaveBeenCalledWith('123')
+
+            expect(response.status).toBe(204)
+        })
+
+        it('should return 404 when calling terracell contract endpoint and terracell not found', async () => {
+            mockAlgoIndexer.callAlgonodeIndexerEndpoint.mockImplementation(params => {
+                switch (params) {
+                    case 'assets/123':
+                        return Promise.resolve({
+                            status: 404
+                        })
+                    case 'applications/456':
+                        return Promise.resolve({
+                            status: 200,
+                            json: {
+                                application: {
+                                    params: {
+                                        'approval-program': 'approval_program_value'
+                                    }
+                                }
+                            }
+                        })
+                }
+            })
+
+            const response = await request(app.callback()).delete('/terracells/123/contracts/456')
+
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledTimes(2)
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/123')
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('applications/456')
+
+            expect(mockTokenRepository.deleteTokenContract).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(404)
+        })
+
+        it('should return 404 when calling terracell contract endpoint and asset not terracell', async () => {
+            mockAlgoIndexer.callAlgonodeIndexerEndpoint.mockImplementation(params => {
+                switch (params) {
+                    case 'assets/123':
+                        return Promise.resolve({
+                            status: 200,
+                            json: {
+                                asset: {
+                                    index: 123,
+                                    params: {
+                                        name: 'Terracell #1',
+                                        total: 1,
+                                        decimals: 0,
+                                        'unit-name': 'meh',
+                                        url: 'https://terragrids.org#1'
+                                    }
+                                }
+                            }
+                        })
+                    case 'applications/456':
+                        return Promise.resolve({
+                            status: 200,
+                            json: {
+                                application: {
+                                    params: {
+                                        'approval-program': 'approval_program_value'
+                                    }
+                                }
+                            }
+                        })
+                }
+            })
+
+            const response = await request(app.callback()).delete('/terracells/123/contracts/456')
+
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledTimes(2)
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/123')
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('applications/456')
+
+            expect(mockTokenRepository.deleteTokenContract).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(404)
+        })
+
+        it('should return 400 when calling terracell contract endpoint and application still running', async () => {
+            mockAlgoIndexer.callAlgonodeIndexerEndpoint.mockImplementation(params => {
+                switch (params) {
+                    case 'assets/123':
+                        return Promise.resolve({
+                            status: 200,
+                            json: {
+                                asset: {
+                                    index: 123,
+                                    params: {
+                                        name: 'Terracell #1',
+                                        total: 1,
+                                        decimals: 0,
+                                        'unit-name': 'TRCL',
+                                        url: 'https://terragrids.org#1'
+                                    }
+                                }
+                            }
+                        })
+                    case 'applications/456':
+                        return Promise.resolve({
+                            status: 200,
+                            json: {
+                                application: {
+                                    id: '456',
+                                    params: {
+                                        'approval-program': 'meh'
+                                    }
+                                }
+                            }
+                        })
+                }
+            })
+
+            const response = await request(app.callback()).delete('/terracells/123/contracts/456')
+
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledTimes(2)
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/123')
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('applications/456')
+
+            expect(mockTokenRepository.deleteTokenContract).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(400)
+            expect(response.body).toEqual({
+                error: 'ApplicationStillRunningError',
+                message: 'Application specified is still running'
             })
         })
     })

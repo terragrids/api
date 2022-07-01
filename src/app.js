@@ -3,11 +3,15 @@
 import dotenv from 'dotenv'
 import Koa from 'koa'
 import Router from '@koa/router'
+import bodyparser from 'koa-bodyparser'
 import AlgoIndexer from './network/algo-indexer.js'
 import TokenRepository from './repository/token.repository.js'
 import AssetNotFoundError from './error/asset-not-found.error.js'
 import errorHandler from './middleware/error-handler.js'
 import requestLogger from './middleware/request-logger.js'
+import MissingParameterError from './error/missing-parameter.error.js'
+import ApplicationNotFoundError from './error/application-not-found.error.js'
+import ApplicationStillRunningError from './error/application-still-running.error.js'
 
 dotenv.config()
 export const app = new Koa()
@@ -66,6 +70,73 @@ router.get('/terracells/:assetId', async (ctx) => {
                 ...contract && { contract }
             })
         }
+    }
+})
+
+router.post('/terracells/:assetId/contracts/:applicationId', bodyparser(), async (ctx) => {
+    if (!ctx.request.body.contractInfo) throw new MissingParameterError('contractInfo')
+    if (!ctx.request.body.sellerAddress) throw new MissingParameterError('sellerAddress')
+    if (!ctx.request.body.assetPrice) throw new MissingParameterError('assetPrice')
+    if (!ctx.request.body.assetPriceUnit) throw new MissingParameterError('assetPriceUnit')
+
+    const algoIndexer = new AlgoIndexer()
+    const [assetResponse, appResponse] = await Promise.all([
+        algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}`),
+        algoIndexer.callAlgonodeIndexerEndpoint(`applications/${ctx.params.applicationId}`)
+    ])
+
+    if (assetResponse.status !== 200 || !assetResponse.json.asset || assetResponse.json.asset.params['unit-name'] !== 'TRCL') {
+        throw new AssetNotFoundError()
+    }
+
+    if (appResponse.status !== 200 || appResponse.json.application.params['approval-program'] !== process.env.ALGO_APP_APPROVAL) {
+        throw new ApplicationNotFoundError()
+    }
+
+    await new TokenRepository().putTokenContract({
+        assetId: ctx.params.assetId,
+        applicationId: ctx.params.applicationId,
+        contractInfo: ctx.request.body.contractInfo,
+        sellerAddress: ctx.request.body.sellerAddress,
+        assetPrice: ctx.request.body.assetPrice,
+        assetPriceUnit: ctx.request.body.assetPriceUnit
+    })
+
+    ctx.body = ''
+    ctx.status = 201
+})
+
+router.delete('/terracells/:assetId/contracts/:applicationId', async (ctx) => {
+    const algoIndexer = new AlgoIndexer()
+    const [assetResponse, appResponse] = await Promise.all([
+        algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}`),
+        algoIndexer.callAlgonodeIndexerEndpoint(`applications/${ctx.params.applicationId}`)
+    ])
+
+    if (assetResponse.status !== 200 || !assetResponse.json.asset || assetResponse.json.asset.params['unit-name'] !== 'TRCL') {
+        throw new AssetNotFoundError()
+    }
+
+    if (appResponse.status === 200 && appResponse.json.application.id === `${ctx.params.applicationId}`) {
+        throw new ApplicationStillRunningError()
+    }
+
+    await new TokenRepository().deleteTokenContract(ctx.params.assetId)
+
+    ctx.body = ''
+    ctx.status = 204
+})
+
+router.get('/accounts/:accountId/terracells', async (ctx) => {
+    const response = await new AlgoIndexer().callRandLabsIndexerEndpoint(`accounts/${ctx.params.accountId}/assets`)
+    ctx.body = {
+        assets: response.status !== 200 ? [] : response.json.assets
+            .filter(asset => !asset.deleted && asset.amount === 1 && asset.decimals === 0 && asset['unit-name'] === 'TRCL')
+            .map(asset => ({
+                id: asset['asset-id'],
+                name: asset.name,
+                symbol: asset['unit-name']
+            }))
     }
 })
 
