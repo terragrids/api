@@ -11,6 +11,7 @@ import errorHandler from './middleware/error-handler.js'
 import requestLogger from './middleware/request-logger.js'
 import MissingParameterError from './error/missing-parameter.error.js'
 import ApplicationNotFoundError from './error/application-not-found.error.js'
+import ApplicationStillRunningError from './error/application-still-running.error.js'
 
 dotenv.config()
 export const app = new Koa()
@@ -100,6 +101,27 @@ router.post('/terracells/:assetId/contracts/:applicationId', bodyparser(), async
         assetPrice: ctx.request.body.assetPrice,
         assetPriceUnit: ctx.request.body.assetPriceUnit
     })
+
+    ctx.body = ''
+    ctx.status = 201
+})
+
+router.delete('/terracells/:assetId/contracts/:applicationId', async (ctx) => {
+    const algoIndexer = new AlgoIndexer()
+    const [assetResponse, appResponse] = await Promise.all([
+        algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}`),
+        algoIndexer.callAlgonodeIndexerEndpoint(`applications/${ctx.params.applicationId}`)
+    ])
+
+    if (assetResponse.status !== 200 || !assetResponse.json.asset || assetResponse.json.asset.params['unit-name'] !== 'TRCL') {
+        throw new AssetNotFoundError()
+    }
+
+    if (appResponse.status === 200 && appResponse.json.application.id === `${ctx.params.applicationId}`) {
+        throw new ApplicationStillRunningError()
+    }
+
+    await new TokenRepository().deleteTokenContract(ctx.params.assetId)
 
     ctx.body = ''
     ctx.status = 204
