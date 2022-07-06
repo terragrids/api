@@ -468,7 +468,7 @@ describe('app', function () {
                 applicationId: '456',
                 contractInfo: 'contract_info',
                 sellerAddress: 'seller_address',
-                assetPrice: 10,
+                assetPrice: '10',
                 assetPriceUnit: 'ALGO'
             })
 

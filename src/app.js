@@ -98,7 +98,7 @@ router.post('/terracells/:assetId/contracts/:applicationId', bodyparser(), async
         applicationId: ctx.params.applicationId,
         contractInfo: ctx.request.body.contractInfo,
         sellerAddress: ctx.request.body.sellerAddress,
-        assetPrice: ctx.request.body.assetPrice,
+        assetPrice: ctx.request.body.assetPrice.toString(),
         assetPriceUnit: ctx.request.body.assetPriceUnit
     })
 
