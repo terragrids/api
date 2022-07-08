@@ -13,7 +13,7 @@ export default class TokenRepository extends DynamoDbRepository {
                 sellerAddress: { S: sellerAddress },
                 assetPrice: { S: assetPrice },
                 assetPriceUnit: { S: assetPriceUnit },
-                verified: { S: verified }
+                verified: { BOOL: verified }
             },
             itemLogName: this.itemName
         })
@@ -31,7 +31,7 @@ export default class TokenRepository extends DynamoDbRepository {
             sellerAddress: data.Item.sellerAddress.S,
             assetPrice: data.Item.assetPrice.S,
             assetPriceUnit: data.Item.assetPriceUnit.S,
-            verified: data.Item.verified.S === 'true'
+            verified: data.Item.verified.BOOL
         } : null
     }
 
