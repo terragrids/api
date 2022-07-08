@@ -10,7 +10,6 @@ import AssetNotFoundError from './error/asset-not-found.error.js'
 import errorHandler from './middleware/error-handler.js'
 import requestLogger from './middleware/request-logger.js'
 import MissingParameterError from './error/missing-parameter.error.js'
-import ApplicationNotFoundError from './error/application-not-found.error.js'
 import ApplicationStillRunningError from './error/application-still-running.error.js'
 
 dotenv.config()
@@ -89,20 +88,22 @@ router.post('/terracells/:assetId/contracts/:applicationId', bodyparser(), async
         throw new AssetNotFoundError()
     }
 
+    let contractVerified = true
     if (appResponse.status !== 200 || appResponse.json.application.params['approval-program'] !== process.env.ALGO_APP_APPROVAL) {
-        throw new ApplicationNotFoundError()
+        contractVerified = false
     }
 
     await new TokenRepository().putTokenContract({
         assetId: ctx.params.assetId,
         applicationId: ctx.params.applicationId,
         contractInfo: ctx.request.body.contractInfo,
+        verified: contractVerified,
         sellerAddress: ctx.request.body.sellerAddress,
         assetPrice: ctx.request.body.assetPrice.toString(),
         assetPriceUnit: ctx.request.body.assetPriceUnit
     })
 
-    ctx.body = ''
+    ctx.body = { contractVerified }
     ctx.status = 201
 })
 

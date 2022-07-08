@@ -4,7 +4,7 @@ export default class TokenRepository extends DynamoDbRepository {
     pkPrefix = 'asset'
     itemName = 'token contract'
 
-    async putTokenContract({ assetId, applicationId, contractInfo, sellerAddress, assetPrice, assetPriceUnit }) {
+    async putTokenContract({ assetId, applicationId, contractInfo, sellerAddress, assetPrice, assetPriceUnit, verified }) {
         return await this.put({
             item: {
                 pk: { S: `${this.pkPrefix}|${assetId}` },
@@ -12,7 +12,8 @@ export default class TokenRepository extends DynamoDbRepository {
                 contractInfo: { S: contractInfo },
                 sellerAddress: { S: sellerAddress },
                 assetPrice: { S: assetPrice },
-                assetPriceUnit: { S: assetPriceUnit }
+                assetPriceUnit: { S: assetPriceUnit },
+                verified: { S: verified }
             },
             itemLogName: this.itemName
         })
@@ -29,7 +30,8 @@ export default class TokenRepository extends DynamoDbRepository {
             info: data.Item.contractInfo.S,
             sellerAddress: data.Item.sellerAddress.S,
             assetPrice: data.Item.assetPrice.S,
-            assetPriceUnit: data.Item.assetPriceUnit.S
+            assetPriceUnit: data.Item.assetPriceUnit.S,
+            verified: data.Item.verified.S === 'true'
         } : null
     }
 
