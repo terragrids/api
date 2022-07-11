@@ -28,6 +28,13 @@ jest.mock('./repository/ipfs.repository.js', () => jest.fn().mockImplementation(
     testConnection: mockIpfsRepository.testConnection
 })))
 
+const mockS3Repository = {
+    testConnection: jest.fn().mockImplementation(() => jest.fn())
+}
+jest.mock('./repository/s3.repository.js', () => jest.fn().mockImplementation(() => ({
+    testConnection: mockS3Repository.testConnection
+})))
+
 describe('app', function () {
     const OLD_ENV = process.env
 
@@ -50,18 +57,16 @@ describe('app', function () {
 
     describe('get health check endpoint', function () {
         it('should return 200 when calling hc endpoint', async () => {
-            mockIpfsRepository.testConnection.mockImplementation(() => Promise.resolve({
-                authenticated: true
-            }))
+            mockIpfsRepository.testConnection.mockImplementation(() => Promise.resolve(true))
+            mockS3Repository.testConnection.mockImplementation(() => Promise.resolve(true))
 
             const response = await request(app.callback()).get('/hc')
             expect(response.status).toBe(200)
             expect(response.body).toEqual({
                 env: 'dev',
                 region: 'local',
-                ipfs: {
-                    authenticated: true
-                }
+                ipfs: true,
+                s3: true
             })
         })
     })

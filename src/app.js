@@ -12,6 +12,7 @@ import requestLogger from './middleware/request-logger.js'
 import MissingParameterError from './error/missing-parameter.error.js'
 import ApplicationStillRunningError from './error/application-still-running.error.js'
 import IpfsRepository from './repository/ipfs.repository.js'
+import S3Repository from './repository/s3.repository.js'
 
 dotenv.config()
 export const app = new Koa()
@@ -25,7 +26,8 @@ router.get('/hc', async (ctx) => {
     ctx.body = {
         env: process.env.ENV,
         region: process.env.AWS_REGION,
-        ipfs: await new IpfsRepository().testConnection()
+        ipfs: await new IpfsRepository().testConnection(),
+        s3: await new S3Repository().testConnection()
     }
 })
 

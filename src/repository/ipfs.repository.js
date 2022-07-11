@@ -9,7 +9,8 @@ export default class IpfsRepository {
 
     async testConnection() {
         try {
-            return await this.pinata.testAuthentication()
+            const response = await this.pinata.testAuthentication()
+            return response.authenticated === true ? true : false
         } catch (e) {
             return { error: e }
         }
