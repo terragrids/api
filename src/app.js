@@ -11,6 +11,7 @@ import errorHandler from './middleware/error-handler.js'
 import requestLogger from './middleware/request-logger.js'
 import MissingParameterError from './error/missing-parameter.error.js'
 import ApplicationStillRunningError from './error/application-still-running.error.js'
+import IpfsRepository from './repository/ipfs.repository.js'
 
 dotenv.config()
 export const app = new Koa()
@@ -20,10 +21,11 @@ router.get('/', (ctx) => {
     ctx.body = 'terragrids api'
 })
 
-router.get('/hc', (ctx) => {
+router.get('/hc', async (ctx) => {
     ctx.body = {
         env: process.env.ENV,
-        region: process.env.AWS_REGION
+        region: process.env.AWS_REGION,
+        ipfs: await new IpfsRepository().testConnection()
     }
 })
 
