@@ -145,6 +145,31 @@ router.get('/accounts/:accountId/terracells', async (ctx) => {
     }
 })
 
+router.post('/ipfs/files', bodyparser(), async (ctx) => {
+    if (!ctx.request.body.assetName) throw new MissingParameterError('assetName')
+    if (!ctx.request.body.assetDescription) throw new MissingParameterError('assetDescription')
+    if (!ctx.request.body.fileName) throw new MissingParameterError('fileName')
+
+    const s3 = new S3Repository()
+    const ipfs = new IpfsRepository()
+
+    const s3Object = await s3.getFileReadStream(ctx.request.body.fileName)
+    const resultFile = await ipfs.pinFile(s3Object.fileStream)
+    const resultMeta = await ipfs.pinJson({
+        assetName: ctx.request.body.assetName,
+        assetDescription: ctx.request.body.assetDescription,
+        ipfsHash: resultFile.IpfsHash,
+        fileName: ctx.request.body.fileName,
+        fileMimetype: s3Object.contentType
+    })
+
+    ctx.body = {
+        fileHash: resultFile.IpfsHash,
+        metaHash: resultMeta.IpfsHash
+    }
+    ctx.status = 200
+})
+
 app
     .use(requestLogger)
     .use(errorHandler)
