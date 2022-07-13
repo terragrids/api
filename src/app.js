@@ -145,6 +145,8 @@ router.get('/accounts/:accountId/terracells', async (ctx) => {
     }
 })
 
+// TODO add tests
+/* istanbul ignore next */
 router.post('/ipfs/files', bodyparser(), async (ctx) => {
     if (!ctx.request.body.assetName) throw new MissingParameterError('assetName')
     if (!ctx.request.body.assetDescription) throw new MissingParameterError('assetDescription')
