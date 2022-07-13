@@ -21,6 +21,20 @@ jest.mock('./repository/token.repository.js', () => jest.fn().mockImplementation
     deleteTokenContract: mockTokenRepository.deleteTokenContract
 })))
 
+const mockIpfsRepository = {
+    testConnection: jest.fn().mockImplementation(() => jest.fn())
+}
+jest.mock('./repository/ipfs.repository.js', () => jest.fn().mockImplementation(() => ({
+    testConnection: mockIpfsRepository.testConnection
+})))
+
+const mockS3Repository = {
+    testConnection: jest.fn().mockImplementation(() => jest.fn())
+}
+jest.mock('./repository/s3.repository.js', () => jest.fn().mockImplementation(() => ({
+    testConnection: mockS3Repository.testConnection
+})))
+
 describe('app', function () {
     const OLD_ENV = process.env
 
@@ -43,9 +57,17 @@ describe('app', function () {
 
     describe('get health check endpoint', function () {
         it('should return 200 when calling hc endpoint', async () => {
+            mockIpfsRepository.testConnection.mockImplementation(() => Promise.resolve(true))
+            mockS3Repository.testConnection.mockImplementation(() => Promise.resolve(true))
+
             const response = await request(app.callback()).get('/hc')
             expect(response.status).toBe(200)
-            expect(response.body).toEqual({ env: 'dev', region: 'local' })
+            expect(response.body).toEqual({
+                env: 'dev',
+                region: 'local',
+                ipfs: true,
+                s3: true
+            })
         })
     })
 
@@ -468,11 +490,15 @@ describe('app', function () {
                 applicationId: '456',
                 contractInfo: 'contract_info',
                 sellerAddress: 'seller_address',
-                assetPrice: 10,
-                assetPriceUnit: 'ALGO'
+                assetPrice: '10',
+                assetPriceUnit: 'ALGO',
+                verified: true
             })
 
             expect(response.status).toBe(201)
+            expect(response.body).toEqual({
+                contractVerified: true
+            })
         })
 
         it('should return 404 when calling terracell contract endpoint and terracell not found', async () => {
@@ -610,9 +636,21 @@ describe('app', function () {
             expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/123')
             expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('applications/456')
 
-            expect(mockTokenRepository.putTokenContract).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putTokenContract).toHaveBeenCalledTimes(1)
+            expect(mockTokenRepository.putTokenContract).toHaveBeenCalledWith({
+                assetId: '123',
+                applicationId: '456',
+                contractInfo: 'contract_info',
+                sellerAddress: 'seller_address',
+                assetPrice: '10',
+                assetPriceUnit: 'ALGO',
+                verified: false
+            })
 
-            expect(response.status).toBe(404)
+            expect(response.status).toBe(201)
+            expect(response.body).toEqual({
+                contractVerified: false
+            })
         })
 
         it('should return 404 when calling terracell contract endpoint and application approval program not valid', async () => {
@@ -663,9 +701,21 @@ describe('app', function () {
             expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/123')
             expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('applications/456')
 
-            expect(mockTokenRepository.putTokenContract).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putTokenContract).toHaveBeenCalledTimes(1)
+            expect(mockTokenRepository.putTokenContract).toHaveBeenCalledWith({
+                assetId: '123',
+                applicationId: '456',
+                contractInfo: 'contract_info',
+                sellerAddress: 'seller_address',
+                assetPrice: '10',
+                assetPriceUnit: 'ALGO',
+                verified: false
+            })
 
-            expect(response.status).toBe(404)
+            expect(response.status).toBe(201)
+            expect(response.body).toEqual({
+                contractVerified: false
+            })
         })
 
         it('should return 400 when calling terracell contract endpoint and contract info missing', async () => {

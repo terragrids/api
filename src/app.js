@@ -10,8 +10,9 @@ import AssetNotFoundError from './error/asset-not-found.error.js'
 import errorHandler from './middleware/error-handler.js'
 import requestLogger from './middleware/request-logger.js'
 import MissingParameterError from './error/missing-parameter.error.js'
-import ApplicationNotFoundError from './error/application-not-found.error.js'
 import ApplicationStillRunningError from './error/application-still-running.error.js'
+import IpfsRepository from './repository/ipfs.repository.js'
+import S3Repository from './repository/s3.repository.js'
 
 dotenv.config()
 export const app = new Koa()
@@ -21,10 +22,12 @@ router.get('/', (ctx) => {
     ctx.body = 'terragrids api'
 })
 
-router.get('/hc', (ctx) => {
+router.get('/hc', async (ctx) => {
     ctx.body = {
         env: process.env.ENV,
-        region: process.env.AWS_REGION
+        region: process.env.AWS_REGION,
+        ipfs: await new IpfsRepository().testConnection(),
+        s3: await new S3Repository().testConnection()
     }
 })
 
@@ -89,20 +92,22 @@ router.post('/terracells/:assetId/contracts/:applicationId', bodyparser(), async
         throw new AssetNotFoundError()
     }
 
+    let contractVerified = true
     if (appResponse.status !== 200 || appResponse.json.application.params['approval-program'] !== process.env.ALGO_APP_APPROVAL) {
-        throw new ApplicationNotFoundError()
+        contractVerified = false
     }
 
     await new TokenRepository().putTokenContract({
         assetId: ctx.params.assetId,
         applicationId: ctx.params.applicationId,
         contractInfo: ctx.request.body.contractInfo,
+        verified: contractVerified,
         sellerAddress: ctx.request.body.sellerAddress,
-        assetPrice: ctx.request.body.assetPrice,
+        assetPrice: ctx.request.body.assetPrice.toString(),
         assetPriceUnit: ctx.request.body.assetPriceUnit
     })
 
-    ctx.body = ''
+    ctx.body = { contractVerified }
     ctx.status = 201
 })
 
@@ -138,6 +143,33 @@ router.get('/accounts/:accountId/terracells', async (ctx) => {
                 symbol: asset['unit-name']
             }))
     }
+})
+
+// TODO add tests
+/* istanbul ignore next */
+router.post('/ipfs/files', bodyparser(), async (ctx) => {
+    if (!ctx.request.body.assetName) throw new MissingParameterError('assetName')
+    if (!ctx.request.body.assetDescription) throw new MissingParameterError('assetDescription')
+    if (!ctx.request.body.fileName) throw new MissingParameterError('fileName')
+
+    const s3 = new S3Repository()
+    const ipfs = new IpfsRepository()
+
+    const s3Object = await s3.getFileReadStream(ctx.request.body.fileName)
+    const resultFile = await ipfs.pinFile(s3Object.fileStream)
+    const resultMeta = await ipfs.pinJson({
+        assetName: ctx.request.body.assetName,
+        assetDescription: ctx.request.body.assetDescription,
+        ipfsHash: resultFile.IpfsHash,
+        fileName: ctx.request.body.fileName,
+        fileMimetype: s3Object.contentType
+    })
+
+    ctx.body = {
+        fileHash: resultFile.IpfsHash,
+        metaHash: resultMeta.IpfsHash
+    }
+    ctx.status = 200
 })
 
 app
