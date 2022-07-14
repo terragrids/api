@@ -9,7 +9,7 @@ The Terragrids API is a [Koa](https://koajs.com/) application running on Node.js
 
 For every commit on the `dev` or `master` branch, GitHub Actions workflows build the application and deploy it to a multi-region AWS Lambda running in `eu-west-3` and `us-west-1`.
 
-`dev` builds will be accesible at `https://dev-api.terragrids.org`, while `master` builds will be accesible at `https://api.terragrids.org` through and AWS API Gateway.
+`dev` builds will be accessible at `https://dev-api.terragrids.org`, while `master` builds will be accessible at `https://api.terragrids.org` through and AWS API Gateway.
 
 ## Prerequisites
 To start with the development, you need to have a recent version of `node` and `npm` installed.
