@@ -37,6 +37,6 @@ npm test
 To make contributions, check out the `dev` branch, crate a personal branch and push your commits. When you are ready, open a Pull Request on the `dev` branch.
 
 **Dev rules**
-1. If possible, please use Visual Code to write changes and make contributions to the repository. This will ensure code stadard consistency.
+1. If possible, please use Visual Code to write changes and make contributions to the repository. This will ensure code standard consistency.
 2. Make small Pull Requests. This will ensure other developers and project maintainers can review your changes and give feedback as quickly as possible. 
 3. Never make a Pull Request on `master`. The `master` branch is regularly updated with `dev` only by project maintainers. 
