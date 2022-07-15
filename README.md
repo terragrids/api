@@ -9,7 +9,7 @@ The Terragrids API is a [Koa](https://koajs.com/) application running on Node.js
 
 For every commit on the `dev` or `master` branch, GitHub Actions workflows build the application and deploy it to a multi-region AWS Lambda running in `eu-west-3` and `us-west-1`.
 
-`dev` builds will be accesible at `https://dev-api.terragrids.org`, while `master` builds will be accesible at `https://api.terragrids.org` through and AWS API Gateway.
+`dev` builds will be accessible at `https://dev-api.terragrids.org`, while `master` builds will be accessible at `https://api.terragrids.org` through and AWS API Gateway.
 
 ## Prerequisites
 To start with the development, you need to have a recent version of `node` and `npm` installed.
@@ -37,6 +37,6 @@ npm test
 To make contributions, check out the `dev` branch, crate a personal branch and push your commits. When you are ready, open a Pull Request on the `dev` branch.
 
 **Dev rules**
-1. If possible, please use Visual Code to write changes and make contributions to the repository. This will ensure code stadard consistency.
+1. If possible, please use Visual Code to write changes and make contributions to the repository. This will ensure code standard consistency.
 2. Make small Pull Requests. This will ensure other developers and project maintainers can review your changes and give feedback as quickly as possible. 
 3. Never make a Pull Request on `master`. The `master` branch is regularly updated with `dev` only by project maintainers. 
