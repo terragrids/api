@@ -1,4 +1,5 @@
 import { GetObjectCommand, HeadBucketCommand, S3Client } from '@aws-sdk/client-s3'
+import S3KeyNotFoundError from '../error/s3-key-not-found-error.js'
 import S3ReadError from '../error/s3-read-error.js'
 
 export default class S3Repository {
@@ -27,16 +28,24 @@ export default class S3Repository {
             Bucket: this.bucket,
             Key: fileName
         })
-        const response = await this.s3.send(command)
 
-        if (response.$metadata.httpStatusCode === 200) {
-            return {
-                contentType: response.ContentType,
-                contentLength: response.ContentLength,
-                fileStream: response.Body
+        try {
+            const response = await this.s3.send(command)
+            if (response.$metadata.httpStatusCode === 200) {
+                return {
+                    contentType: response.ContentType,
+                    contentLength: response.ContentLength,
+                    fileStream: response.Body
+                }
+            } else {
+                throw new S3ReadError()
             }
-        } else {
-            throw new S3ReadError()
+        } catch (e) {
+            if (e.$metadata.httpStatusCode === 404) {
+                throw new S3KeyNotFoundError()
+            } else {
+                throw new S3ReadError()
+            }
         }
     }
 }
