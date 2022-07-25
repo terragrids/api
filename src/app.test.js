@@ -34,11 +34,13 @@ jest.mock('./repository/ipfs.repository.js', () => jest.fn().mockImplementation(
 
 const mockS3Repository = {
     testConnection: jest.fn().mockImplementation(() => jest.fn()),
-    getFileReadStream: jest.fn().mockImplementation(() => jest.fn())
+    getFileReadStream: jest.fn().mockImplementation(() => jest.fn()),
+    getUploadSignedUrl: jest.fn().mockImplementation(() => jest.fn())
 }
 jest.mock('./repository/s3.repository.js', () => jest.fn().mockImplementation(() => ({
     testConnection: mockS3Repository.testConnection,
-    getFileReadStream: mockS3Repository.getFileReadStream
+    getFileReadStream: mockS3Repository.getFileReadStream,
+    getUploadSignedUrl: mockS3Repository.getUploadSignedUrl
 })))
 
 describe('app', function () {
@@ -1087,6 +1089,48 @@ describe('app', function () {
             expect(response.body).toEqual({
                 error: 'MissingParameterError',
                 message: 'fileName must be specified'
+            })
+        })
+    })
+
+    describe('post files upload endpoint', function () {
+        it('should return 201 when calling files upload endpoint', async () => {
+            process.env.ALGO_APP_APPROVAL = 'approval_program_value'
+
+            mockS3Repository.getUploadSignedUrl.mockImplementation(() => {
+                return Promise.resolve({
+                    id: 'id',
+                    url: 'url'
+                })
+            })
+
+            const response = await request(app.callback())
+                .post('/files/upload')
+                .send({
+                    contentType: 'content/type'
+                })
+
+            expect(mockS3Repository.getUploadSignedUrl).toHaveBeenCalledTimes(1)
+            expect(mockS3Repository.getUploadSignedUrl).toHaveBeenCalledWith('content/type')
+
+            expect(response.status).toBe(201)
+            expect(response.body).toEqual({
+                id: 'id',
+                url: 'url'
+            })
+        })
+
+        it('should return 400 when calling files upload endpoint and content type info missing', async () => {
+            const response = await request(app.callback())
+                .post('/files/upload')
+                .send({})
+
+            expect(mockS3Repository.getUploadSignedUrl).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(400)
+            expect(response.body).toEqual({
+                error: 'MissingParameterError',
+                message: 'contentType must be specified'
             })
         })
     })

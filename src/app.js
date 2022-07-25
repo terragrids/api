@@ -170,6 +170,16 @@ router.post('/ipfs/files', bodyparser(), async (ctx) => {
     ctx.status = 201
 })
 
+router.post('/files/upload', bodyparser(), async ctx => {
+    if (!ctx.request.body.contentType) throw new MissingParameterError('contentType')
+    const response = await new S3Repository().getUploadSignedUrl(ctx.request.body.contentType)
+    ctx.body = {
+        id: response.id,
+        url: response.url
+    }
+    ctx.status = 201
+})
+
 app
     .use(requestLogger)
     .use(errorHandler)
