@@ -22,17 +22,23 @@ jest.mock('./repository/token.repository.js', () => jest.fn().mockImplementation
 })))
 
 const mockIpfsRepository = {
-    testConnection: jest.fn().mockImplementation(() => jest.fn())
+    testConnection: jest.fn().mockImplementation(() => jest.fn()),
+    pinFile: jest.fn().mockImplementation(() => jest.fn()),
+    pinJson: jest.fn().mockImplementation(() => jest.fn())
 }
 jest.mock('./repository/ipfs.repository.js', () => jest.fn().mockImplementation(() => ({
-    testConnection: mockIpfsRepository.testConnection
+    testConnection: mockIpfsRepository.testConnection,
+    pinFile: mockIpfsRepository.pinFile,
+    pinJson: mockIpfsRepository.pinJson
 })))
 
 const mockS3Repository = {
-    testConnection: jest.fn().mockImplementation(() => jest.fn())
+    testConnection: jest.fn().mockImplementation(() => jest.fn()),
+    getFileReadStream: jest.fn().mockImplementation(() => jest.fn())
 }
 jest.mock('./repository/s3.repository.js', () => jest.fn().mockImplementation(() => ({
-    testConnection: mockS3Repository.testConnection
+    testConnection: mockS3Repository.testConnection,
+    getFileReadStream: mockS3Repository.getFileReadStream
 })))
 
 describe('app', function () {
@@ -970,6 +976,117 @@ describe('app', function () {
             expect(response.body).toEqual({
                 error: 'ApplicationStillRunningError',
                 message: 'Application specified is still running'
+            })
+        })
+    })
+
+    describe('post ipfs files endpoint', function () {
+        it('should return 201 when calling ipfs files endpoint and s3 file is found', async () => {
+            process.env.ALGO_APP_APPROVAL = 'approval_program_value'
+
+            mockS3Repository.getFileReadStream.mockImplementation(() => {
+                return Promise.resolve({
+                    fileStream: 'fileStream',
+                    contentType: 'content/type'
+                })
+            })
+
+            mockIpfsRepository.pinFile.mockImplementation(() => {
+                return Promise.resolve({
+                    IpfsHash: 'FileIpfsHash'
+                })
+            })
+
+            mockIpfsRepository.pinJson.mockImplementation(() => {
+                return Promise.resolve({
+                    IpfsHash: 'JsonIpfsHash'
+                })
+            })
+
+            const response = await request(app.callback())
+                .post('/ipfs/files')
+                .send({
+                    assetName: 'asset name',
+                    assetDescription: 'asset description',
+                    fileName: 'filename'
+                })
+
+            expect(mockS3Repository.getFileReadStream).toHaveBeenCalledTimes(1)
+            expect(mockS3Repository.getFileReadStream).toHaveBeenCalledWith('filename')
+
+            expect(mockIpfsRepository.pinFile).toHaveBeenCalledTimes(1)
+            expect(mockIpfsRepository.pinFile).toHaveBeenCalledWith('fileStream')
+
+            expect(mockIpfsRepository.pinJson).toHaveBeenCalledTimes(1)
+            expect(mockIpfsRepository.pinJson).toHaveBeenCalledWith({
+                assetName: 'asset name',
+                assetDescription: 'asset description',
+                ipfsHash: 'FileIpfsHash',
+                fileName: 'filename',
+                fileMimetype: 'content/type'
+            })
+
+            expect(response.status).toBe(201)
+            expect(response.body).toEqual({
+                fileHash: 'FileIpfsHash',
+                metaHash: 'JsonIpfsHash'
+            })
+        })
+
+        it('should return 400 when calling ipfs files endpoint and asset name info missing', async () => {
+            const response = await request(app.callback())
+                .post('/ipfs/files')
+                .send({
+                    assetDescription: 'asset description',
+                    fileName: 'filename'
+                })
+
+            expect(mockS3Repository.getFileReadStream).not.toHaveBeenCalled()
+            expect(mockIpfsRepository.pinFile).not.toHaveBeenCalled()
+            expect(mockIpfsRepository.pinJson).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(400)
+            expect(response.body).toEqual({
+                error: 'MissingParameterError',
+                message: 'assetName must be specified'
+            })
+        })
+
+        it('should return 400 when calling ipfs files endpoint and asset description info missing', async () => {
+            const response = await request(app.callback())
+                .post('/ipfs/files')
+                .send({
+                    assetName: 'asset name',
+                    fileName: 'filename'
+                })
+
+            expect(mockS3Repository.getFileReadStream).not.toHaveBeenCalled()
+            expect(mockIpfsRepository.pinFile).not.toHaveBeenCalled()
+            expect(mockIpfsRepository.pinJson).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(400)
+            expect(response.body).toEqual({
+                error: 'MissingParameterError',
+                message: 'assetDescription must be specified'
+            })
+        })
+
+        it('should return 400 when calling ipfs files endpoint and file name info missing', async () => {
+            const response = await request(app.callback())
+                .post('/ipfs/files')
+                .send({
+                    assetName: 'asset name',
+                    assetDescription: 'asset description'
+                })
+
+            expect(mockS3Repository.getFileReadStream).not.toHaveBeenCalled()
+            expect(mockIpfsRepository.pinFile).not.toHaveBeenCalled()
+            expect(mockIpfsRepository.pinJson).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(400)
+            expect(response.body).toEqual({
+                error: 'MissingParameterError',
+                message: 'fileName must be specified'
             })
         })
     })
