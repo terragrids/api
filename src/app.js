@@ -145,8 +145,6 @@ router.get('/accounts/:accountId/terracells', async (ctx) => {
     }
 })
 
-// TODO add tests
-/* istanbul ignore next */
 router.post('/ipfs/files', bodyparser(), async (ctx) => {
     if (!ctx.request.body.assetName) throw new MissingParameterError('assetName')
     if (!ctx.request.body.assetDescription) throw new MissingParameterError('assetDescription')
@@ -169,7 +167,17 @@ router.post('/ipfs/files', bodyparser(), async (ctx) => {
         fileHash: resultFile.IpfsHash,
         metaHash: resultMeta.IpfsHash
     }
-    ctx.status = 200
+    ctx.status = 201
+})
+
+router.post('/files/upload', bodyparser(), async ctx => {
+    if (!ctx.request.body.contentType) throw new MissingParameterError('contentType')
+    const response = await new S3Repository().getUploadSignedUrl(ctx.request.body.contentType)
+    ctx.body = {
+        id: response.id,
+        url: response.url
+    }
+    ctx.status = 201
 })
 
 app
