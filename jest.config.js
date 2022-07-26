@@ -2,7 +2,8 @@ export default {
     verbose: true,
     collectCoverage: true,
     collectCoverageFrom: [
-        '**/src/app.js'
+        '**/src/app.js',
+        '**/src/utils/**'
     ],
     coverageThreshold: {
         'global': {

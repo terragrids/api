@@ -1,4 +1,5 @@
-import { GetObjectCommand, HeadBucketCommand, S3Client } from '@aws-sdk/client-s3'
+import { GetObjectCommand, HeadBucketCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import S3KeyNotFoundError from '../error/s3-key-not-found-error.js'
 import S3ReadError from '../error/s3-read-error.js'
 import uuid from '../utils/uuid.js'
@@ -54,7 +55,7 @@ export default class S3Repository {
         const imageId = uuid()
 
         const parameters = {
-            Bucket: this.s3Bucket,
+            Bucket: this.bucket,
             Key: imageId,
             ContentType: contentType,
             CacheControl: 'max-age=7776000',  // instructs CloudFront to cache for 90 days
@@ -64,11 +65,13 @@ export default class S3Repository {
             }
         }
 
-        const s3PutObjectUrl = await this.s3.getSignedUrlPromise('putObject', parameters)
+        const fiveMinutes = 300
+        const command = new PutObjectCommand(parameters)
+        const url = await getSignedUrl(this.s3, command, { expiresIn: fiveMinutes })
 
         return {
             id: imageId,
-            url: s3PutObjectUrl
+            url: url
         }
     }
 }
