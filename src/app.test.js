@@ -1001,7 +1001,9 @@ describe('app', function () {
 
             mockIpfsRepository.pinJson.mockImplementation(() => {
                 return Promise.resolve({
-                    IpfsHash: 'JsonIpfsHash'
+                    IpfsHash: 'JsonIpfsHash',
+                    assetName: 'asset-name',
+                    integrity: 'json-integrity'
                 })
             })
 
@@ -1023,15 +1025,16 @@ describe('app', function () {
             expect(mockIpfsRepository.pinJson).toHaveBeenCalledWith({
                 assetName: 'asset name',
                 assetDescription: 'asset description',
-                ipfsHash: 'FileIpfsHash',
+                fileIpfsHash: 'FileIpfsHash',
                 fileName: 'filename',
                 fileMimetype: 'content/type'
             })
 
             expect(response.status).toBe(201)
             expect(response.body).toEqual({
-                fileHash: 'FileIpfsHash',
-                metaHash: 'JsonIpfsHash'
+                assetName: 'asset-name',
+                url: 'ipfs://JsonIpfsHash',
+                integrity: 'json-integrity'
             })
         })
 

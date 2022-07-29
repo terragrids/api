@@ -158,14 +158,15 @@ router.post('/ipfs/files', bodyparser(), async (ctx) => {
     const resultMeta = await ipfs.pinJson({
         assetName: ctx.request.body.assetName,
         assetDescription: ctx.request.body.assetDescription,
-        ipfsHash: resultFile.IpfsHash,
+        fileIpfsHash: resultFile.IpfsHash,
         fileName: ctx.request.body.fileName,
         fileMimetype: s3Object.contentType
     })
 
     ctx.body = {
-        fileHash: resultFile.IpfsHash,
-        metaHash: resultMeta.IpfsHash
+        assetName: resultMeta.assetName,
+        url: `ipfs://${resultMeta.IpfsHash}`,
+        integrity: resultMeta.integrity
     }
     ctx.status = 201
 })
