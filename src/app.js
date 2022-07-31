@@ -145,6 +145,20 @@ router.get('/accounts/:accountId/terracells', async (ctx) => {
     }
 })
 
+router.get('/accounts/:accountId/nfts/:symbol', async (ctx) => {
+    const response = await new AlgoIndexer().callRandLabsIndexerEndpoint(`accounts/${ctx.params.accountId}/assets`)
+    const symbol = ctx.params.symbol.toUpperCase()
+    ctx.body = {
+        assets: response.status !== 200 ? [] : response.json.assets
+            .filter(asset => !asset.deleted && asset.amount === 1 && asset.decimals === 0 && asset['unit-name'] === symbol)
+            .map(asset => ({
+                id: asset['asset-id'],
+                name: asset.name,
+                symbol: asset['unit-name']
+            }))
+    }
+})
+
 router.post('/ipfs/files', bodyparser(), async (ctx) => {
     if (!ctx.request.body.assetName) throw new MissingParameterError('assetName')
     if (!ctx.request.body.assetDescription) throw new MissingParameterError('assetDescription')

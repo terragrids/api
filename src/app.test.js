@@ -443,6 +443,98 @@ describe('app', function () {
         })
     })
 
+    describe('get account nft type endpoint', function () {
+        it('should return 200 when calling account nft type endpoint and no assets found', async () => {
+            mockAlgoIndexer.callRandLabsIndexerEndpoint.mockImplementation(() => Promise.resolve({
+                status: 404
+            }))
+
+            const response = await request(app.callback()).get('/accounts/123/nfts/symbol')
+
+            expect(mockAlgoIndexer.callRandLabsIndexerEndpoint).toHaveBeenCalledTimes(1)
+            expect(mockAlgoIndexer.callRandLabsIndexerEndpoint).toHaveBeenCalledWith('accounts/123/assets')
+
+            expect(response.status).toBe(200)
+            expect(response.body).toEqual({ assets: [] })
+        })
+
+        it('should return 200 when calling account terracells endpoint and assets found', async () => {
+            mockAlgoIndexer.callRandLabsIndexerEndpoint.mockImplementation(() => Promise.resolve({
+                status: 200,
+                json: {
+                    assets: [{
+                        'asset-id': 1,
+                        amount: 1,
+                        decimals: 0,
+                        deleted: false,
+                        'unit-name': 'TRCL',
+                        name: 'Terracell 1'
+                    }, {
+                        'asset-id': 2,
+                        amount: 0,
+                        decimals: 0,
+                        deleted: false,
+                        'unit-name': 'TRCL',
+                        name: 'Terracell 2'
+                    }, {
+                        'asset-id': 3,
+                        amount: 1,
+                        decimals: 0,
+                        deleted: true,
+                        'unit-name': 'TRCL',
+                        name: 'Terracell 3'
+                    }, {
+                        'asset-id': 4,
+                        amount: 2,
+                        decimals: 0,
+                        deleted: false,
+                        'unit-name': 'TRCL',
+                        name: 'Terracell 4'
+                    }, {
+                        'asset-id': 5,
+                        amount: 1,
+                        decimals: 1,
+                        deleted: false,
+                        'unit-name': 'TRCL',
+                        name: 'Terracell 5'
+                    }, {
+                        'asset-id': 6,
+                        amount: 1,
+                        decimals: 0,
+                        deleted: false,
+                        'unit-name': 'meh',
+                        name: 'Terracell 6'
+                    }, {
+                        'asset-id': 7,
+                        amount: 1,
+                        decimals: 0,
+                        deleted: false,
+                        'unit-name': 'TRCL',
+                        name: 'Terracell 7'
+                    }]
+                }
+            }))
+
+            const response = await request(app.callback()).get('/accounts/123/nfts/trcl')
+
+            expect(mockAlgoIndexer.callRandLabsIndexerEndpoint).toHaveBeenCalledTimes(1)
+            expect(mockAlgoIndexer.callRandLabsIndexerEndpoint).toHaveBeenCalledWith('accounts/123/assets')
+
+            expect(response.status).toBe(200)
+            expect(response.body).toEqual({
+                assets: [{
+                    id: 1,
+                    name: 'Terracell 1',
+                    symbol: 'TRCL'
+                }, {
+                    id: 7,
+                    name: 'Terracell 7',
+                    symbol: 'TRCL'
+                }]
+            })
+        })
+    })
+
     describe('post terracell contract endpoint', function () {
         it('should return 201 when calling terracell contract endpoint and both terracell and application found', async () => {
             process.env.ALGO_APP_APPROVAL = 'approval_program_value'
