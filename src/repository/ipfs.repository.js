@@ -27,24 +27,32 @@ export default class IpfsRepository {
         }
     }
 
-    async pinJson({ assetName, assetDescription, ipfsHash, fileName, fileMimetype, options = {} }) {
+    async pinJson({ assetName, assetDescription, fileIpfsHash, fileName, fileMimetype, options = {} }) {
         try {
-            const integrity = this.convertIpfsCidV0ToByte32(ipfsHash)
+            const fileIntegrity = this.convertIpfsCidV0ToByte32(fileIpfsHash)
+            const name = `${assetName}@arc3`
 
             const metadata = {
-                name: `${assetName}@arc3`,
+                name,
                 description: assetDescription,
-                image: `ipfs://${ipfsHash}`,
-                image_integrity: `sha256-${integrity}`,
+                image: `ipfs://${fileIpfsHash}`,
+                image_integrity: `sha256-${fileIntegrity}`,
                 image_mimetype: fileMimetype,
                 properties: {
                     file_url: fileName,
-                    file_url_integrity: `sha256-${integrity}`,
+                    file_url_integrity: `sha256-${fileIntegrity}`,
                     file_url_mimetype: fileMimetype
                 }
             }
 
-            return await this.pinata.pinJSONToIPFS(metadata, options)
+            const result = await this.pinata.pinJSONToIPFS(metadata, options)
+            const jsonIntegrity = this.convertIpfsCidV0ToByte32(result.IpfsHash)
+
+            return {
+                ...result,
+                assetName: name,
+                integrity: jsonIntegrity
+            }
         } catch (e) {
             throw new IpfsJsonPinningError(e.message)
         }

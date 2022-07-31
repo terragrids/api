@@ -45,6 +45,21 @@ router.get('/terracells', async (ctx) => {
     }
 })
 
+router.get('/nfts/:symbol', async (ctx) => {
+    const symbol = ctx.params.symbol.toUpperCase()
+    const response = await new AlgoIndexer().callRandLabsIndexerEndpoint(`assets?unit=${symbol}`)
+    ctx.body = {
+        assets: response.json.assets
+            .filter(asset => !asset.deleted && asset.params.total === 1 && asset.params.decimals === 0)
+            .map(asset => ({
+                id: asset.index,
+                name: asset.params.name,
+                symbol: asset.params['unit-name'],
+                url: asset.params.url
+            }))
+    }
+})
+
 router.get('/terracells/:assetId', async (ctx) => {
     const algoIndexer = new AlgoIndexer()
     const [assetResponse, balancesResponse, contract] = await Promise.all([
@@ -145,6 +160,20 @@ router.get('/accounts/:accountId/terracells', async (ctx) => {
     }
 })
 
+router.get('/accounts/:accountId/nfts/:symbol', async (ctx) => {
+    const response = await new AlgoIndexer().callRandLabsIndexerEndpoint(`accounts/${ctx.params.accountId}/assets`)
+    const symbol = ctx.params.symbol.toUpperCase()
+    ctx.body = {
+        assets: response.status !== 200 ? [] : response.json.assets
+            .filter(asset => !asset.deleted && asset.amount === 1 && asset.decimals === 0 && asset['unit-name'] === symbol)
+            .map(asset => ({
+                id: asset['asset-id'],
+                name: asset.name,
+                symbol: asset['unit-name']
+            }))
+    }
+})
+
 router.post('/ipfs/files', bodyparser(), async (ctx) => {
     if (!ctx.request.body.assetName) throw new MissingParameterError('assetName')
     if (!ctx.request.body.assetDescription) throw new MissingParameterError('assetDescription')
@@ -158,14 +187,15 @@ router.post('/ipfs/files', bodyparser(), async (ctx) => {
     const resultMeta = await ipfs.pinJson({
         assetName: ctx.request.body.assetName,
         assetDescription: ctx.request.body.assetDescription,
-        ipfsHash: resultFile.IpfsHash,
+        fileIpfsHash: resultFile.IpfsHash,
         fileName: ctx.request.body.fileName,
         fileMimetype: s3Object.contentType
     })
 
     ctx.body = {
-        fileHash: resultFile.IpfsHash,
-        metaHash: resultMeta.IpfsHash
+        assetName: resultMeta.assetName,
+        url: `ipfs://${resultMeta.IpfsHash}`,
+        integrity: resultMeta.integrity
     }
     ctx.status = 201
 })
