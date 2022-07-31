@@ -178,6 +178,105 @@ describe('app', function () {
         })
     })
 
+    describe('get nft type endpoint', function () {
+        it('should return 200 when calling nft type endpoint and no assets found', async () => {
+            mockAlgoIndexer.callRandLabsIndexerEndpoint.mockImplementation(() => Promise.resolve({
+                status: 200,
+                json: {
+                    assets: []
+                }
+            }))
+
+            const response = await request(app.callback()).get('/nfts/symbol')
+
+            expect(mockAlgoIndexer.callRandLabsIndexerEndpoint).toHaveBeenCalledTimes(1)
+            expect(mockAlgoIndexer.callRandLabsIndexerEndpoint).toHaveBeenCalledWith('assets?unit=SYMBOL')
+
+            expect(response.status).toBe(200)
+            expect(response.body).toEqual({ assets: [] })
+        })
+
+        it('should return 200 when calling nft type endpoint and assets found', async () => {
+            mockAlgoIndexer.callRandLabsIndexerEndpoint.mockImplementation(() => Promise.resolve({
+                status: 200,
+                json: {
+                    assets: [{
+                        index: 1,
+                        deleted: false,
+                        params: {
+                            decimals: 0,
+                            name: 'Terracell #1',
+                            total: 1,
+                            'unit-name': 'TRCL',
+                            url: 'https://terragrids.org#1'
+                        }
+                    }, {
+                        index: 2,
+                        deleted: true,
+                        params: {
+                            decimals: 0,
+                            name: 'Terracell #2',
+                            total: 1,
+                            'unit-name': 'TRCL',
+                            url: 'https://terragrids.org#2'
+                        }
+                    },
+                    {
+                        index: 3,
+                        deleted: false,
+                        params: {
+                            decimals: 1,
+                            name: 'Terracell #3',
+                            total: 1,
+                            'unit-name': 'TRCL',
+                            url: 'https://terragrids.org#3'
+                        }
+                    }, {
+                        index: 4,
+                        deleted: false,
+                        params: {
+                            decimals: 0,
+                            name: 'Terracell #4',
+                            total: 100,
+                            'unit-name': 'TRCL',
+                            url: 'https://terragrids.org#4'
+                        }
+                    }, {
+                        index: 5,
+                        deleted: false,
+                        params: {
+                            decimals: 0,
+                            name: 'Terracell #5',
+                            total: 1,
+                            'unit-name': 'TRCL',
+                            url: 'https://terragrids.org#5'
+                        }
+                    }]
+                }
+            }))
+
+            const response = await request(app.callback()).get('/nfts/trcl')
+
+            expect(mockAlgoIndexer.callRandLabsIndexerEndpoint).toHaveBeenCalledTimes(1)
+            expect(mockAlgoIndexer.callRandLabsIndexerEndpoint).toHaveBeenCalledWith('assets?unit=TRCL')
+
+            expect(response.status).toBe(200)
+            expect(response.body).toEqual({
+                assets: [{
+                    id: 1,
+                    name: 'Terracell #1',
+                    symbol: 'TRCL',
+                    url: 'https://terragrids.org#1'
+                }, {
+                    id: 5,
+                    name: 'Terracell #5',
+                    symbol: 'TRCL',
+                    url: 'https://terragrids.org#5'
+                }]
+            })
+        })
+    })
+
     describe('get terracell endpoint', function () {
         it('should return 200 when calling terracell endpoint when assets found with no token contract', async () => {
             mockAlgoIndexer.callAlgonodeIndexerEndpoint.mockImplementation(params => {

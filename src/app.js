@@ -45,6 +45,21 @@ router.get('/terracells', async (ctx) => {
     }
 })
 
+router.get('/nfts/:symbol', async (ctx) => {
+    const symbol = ctx.params.symbol.toUpperCase()
+    const response = await new AlgoIndexer().callRandLabsIndexerEndpoint(`assets?unit=${symbol}`)
+    ctx.body = {
+        assets: response.json.assets
+            .filter(asset => !asset.deleted && asset.params.total === 1 && asset.params.decimals === 0)
+            .map(asset => ({
+                id: asset.index,
+                name: asset.params.name,
+                symbol: asset.params['unit-name'],
+                url: asset.params.url
+            }))
+    }
+})
+
 router.get('/terracells/:assetId', async (ctx) => {
     const algoIndexer = new AlgoIndexer()
     const [assetResponse, balancesResponse, contract] = await Promise.all([
