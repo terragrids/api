@@ -194,16 +194,33 @@ router.get('/nfts/:assetId', async (ctx) => {
 router.get('/nfts/type/:symbol', async (ctx) => {
     const symbol = ctx.params.symbol.toUpperCase()
     const response = await new AlgoIndexer().callRandLabsIndexerEndpoint(`assets?unit=${symbol}`)
-    ctx.body = {
-        assets: response.json.assets
-            .filter(asset => !asset.deleted && asset.params.total === 1 && asset.params.decimals === 0)
-            .map(asset => ({
-                id: asset.index,
-                name: asset.params.name,
-                symbol: asset.params['unit-name'],
-                url: asset.params.url
-            }))
+
+    const algoAssets = response.json.assets
+        .filter(asset => !asset.deleted && asset.params.total === 1 && asset.params.decimals === 0)
+        .map(asset => ({
+            id: asset.index,
+            name: asset.params.name,
+            symbol: asset.params['unit-name'],
+            url: asset.params.url
+        }))
+
+    const tokenRepository = new TokenRepository()
+    const dbCalls = algoAssets.map(asset => tokenRepository.getToken(asset.id))
+
+    const dbResults = await Promise.all(dbCalls)
+
+    const assets = []
+    for (const algoAsset of algoAssets) {
+        const dbAsset = dbResults.find(result => result && result.id === algoAsset.id)
+        if (dbAsset) {
+            assets.push({
+                ...algoAsset,
+                offchainUrl: dbAsset.offchainUrl
+            })
+        }
     }
+
+    ctx.body = { assets }
 })
 
 router.delete('/nfts/:assetId', async (ctx) => {

@@ -37,6 +37,7 @@ export default class TokenRepository extends DynamoDbRepository {
         })
 
         return data.Item ? {
+            id: assetId,
             symbol: data.Item.symbol.S,
             offchainUrl: data.Item.offchainUrl.S,
             contractId: data.Item.applicationId ? data.Item.applicationId.S : null,
