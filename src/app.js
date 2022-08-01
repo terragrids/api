@@ -13,6 +13,7 @@ import MissingParameterError from './error/missing-parameter.error.js'
 import ApplicationStillRunningError from './error/application-still-running.error.js'
 import IpfsRepository from './repository/ipfs.repository.js'
 import S3Repository from './repository/s3.repository.js'
+import { filterAlgoAssetsByDbAssets } from './utils/assets.js'
 
 dotenv.config()
 export const app = new Koa()
@@ -206,20 +207,9 @@ router.get('/nfts/type/:symbol', async (ctx) => {
 
     const tokenRepository = new TokenRepository()
     const dbCalls = algoAssets.map(asset => tokenRepository.getToken(asset.id))
+    const dbAssets = await Promise.all(dbCalls)
 
-    const dbResults = await Promise.all(dbCalls)
-
-    const assets = []
-    for (const algoAsset of algoAssets) {
-        const dbAsset = dbResults.find(result => result && result.id === algoAsset.id)
-        if (dbAsset) {
-            assets.push({
-                ...algoAsset,
-                offchainUrl: dbAsset.offchainUrl
-            })
-        }
-    }
-
+    const assets = filterAlgoAssetsByDbAssets(algoAssets, dbAssets)
     ctx.body = { assets }
 })
 
@@ -231,17 +221,23 @@ router.delete('/nfts/:assetId', async (ctx) => {
 })
 
 router.get('/accounts/:accountId/nfts/:symbol', async (ctx) => {
-    const response = await new AlgoIndexer().callRandLabsIndexerEndpoint(`accounts/${ctx.params.accountId}/assets`)
     const symbol = ctx.params.symbol.toUpperCase()
-    ctx.body = {
-        assets: response.status !== 200 ? [] : response.json.assets
-            .filter(asset => !asset.deleted && asset.amount === 1 && asset.decimals === 0 && asset['unit-name'] === symbol)
-            .map(asset => ({
-                id: asset['asset-id'],
-                name: asset.name,
-                symbol: asset['unit-name']
-            }))
-    }
+    const response = await new AlgoIndexer().callRandLabsIndexerEndpoint(`accounts/${ctx.params.accountId}/assets`)
+
+    const algoAssets = response.status !== 200 ? [] : response.json.assets
+        .filter(asset => !asset.deleted && asset.amount === 1 && asset.decimals === 0 && asset['unit-name'] === symbol)
+        .map(asset => ({
+            id: asset['asset-id'],
+            name: asset.name,
+            symbol: asset['unit-name']
+        }))
+
+    const tokenRepository = new TokenRepository()
+    const dbCalls = algoAssets.map(asset => tokenRepository.getToken(asset.id))
+    const dbAssets = await Promise.all(dbCalls)
+
+    const assets = filterAlgoAssetsByDbAssets(algoAssets, dbAssets)
+    ctx.body = { assets }
 })
 
 router.post('/ipfs/files', bodyparser(), async (ctx) => {
