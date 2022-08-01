@@ -45,27 +45,12 @@ router.get('/terracells', async (ctx) => {
     }
 })
 
-router.get('/nfts/:symbol', async (ctx) => {
-    const symbol = ctx.params.symbol.toUpperCase()
-    const response = await new AlgoIndexer().callRandLabsIndexerEndpoint(`assets?unit=${symbol}`)
-    ctx.body = {
-        assets: response.json.assets
-            .filter(asset => !asset.deleted && asset.params.total === 1 && asset.params.decimals === 0)
-            .map(asset => ({
-                id: asset.index,
-                name: asset.params.name,
-                symbol: asset.params['unit-name'],
-                url: asset.params.url
-            }))
-    }
-})
-
 router.get('/terracells/:assetId', async (ctx) => {
     const algoIndexer = new AlgoIndexer()
     const [assetResponse, balancesResponse, contract] = await Promise.all([
         algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}`),
         algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}/balances`),
-        new TokenRepository().getTokenContract(ctx.params.assetId)
+        new TokenRepository().getToken(ctx.params.assetId)
     ])
 
     if (!assetResponse || assetResponse.status !== 200 || assetResponse.json.asset.params['unit-name'] !== 'TRCL') {
@@ -141,7 +126,7 @@ router.delete('/terracells/:assetId/contracts/:applicationId', async (ctx) => {
         throw new ApplicationStillRunningError()
     }
 
-    await new TokenRepository().deleteTokenContract(ctx.params.assetId)
+    await new TokenRepository().deleteToken(ctx.params.assetId)
 
     ctx.body = ''
     ctx.status = 204
@@ -158,6 +143,74 @@ router.get('/accounts/:accountId/terracells', async (ctx) => {
                 symbol: asset['unit-name']
             }))
     }
+})
+
+router.post('/nfts', bodyparser(), async (ctx) => {
+    if (!ctx.request.body.assetId) throw new MissingParameterError('assetId')
+    if (!ctx.request.body.symbol) throw new MissingParameterError('symbol')
+    if (!ctx.request.body.offchainUrl) throw new MissingParameterError('offchainUrl')
+
+    await new TokenRepository().putToken({
+        assetId: ctx.request.body.assetId,
+        symbol: ctx.request.body.symbol,
+        offchainUrl: ctx.request.body.offchainUrl
+    })
+
+    ctx.body = ''
+    ctx.status = 201
+})
+
+router.get('/nfts/:assetId', async (ctx) => {
+    const algoIndexer = new AlgoIndexer()
+    const [assetResponse, balancesResponse, offchainInfo] = await Promise.all([
+        algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}`),
+        algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}/balances`),
+        new TokenRepository().getToken(ctx.params.assetId)
+    ])
+
+    if (!assetResponse || assetResponse.status !== 200 || !offchainInfo) {
+        throw new AssetNotFoundError()
+    } else {
+        const asset = assetResponse.json.asset
+        const balances = balancesResponse.json.balances
+        ctx.body = {
+            asset: ({
+                id: asset.index,
+                name: asset.params.name,
+                symbol: asset.params['unit-name'],
+                url: asset.params.url,
+                offchainUrl: offchainInfo.offchainUrl,
+                holders: balances
+                    .filter(balance => balance.amount > 0 && !balance.deleted)
+                    .map(balance => ({
+                        address: balance.address,
+                        amount: balance.amount
+                    }))
+            })
+        }
+    }
+})
+
+router.get('/nfts/type/:symbol', async (ctx) => {
+    const symbol = ctx.params.symbol.toUpperCase()
+    const response = await new AlgoIndexer().callRandLabsIndexerEndpoint(`assets?unit=${symbol}`)
+    ctx.body = {
+        assets: response.json.assets
+            .filter(asset => !asset.deleted && asset.params.total === 1 && asset.params.decimals === 0)
+            .map(asset => ({
+                id: asset.index,
+                name: asset.params.name,
+                symbol: asset.params['unit-name'],
+                url: asset.params.url
+            }))
+    }
+})
+
+router.delete('/nfts/:assetId', async (ctx) => {
+    await new TokenRepository().deleteToken(ctx.params.assetId)
+
+    ctx.body = ''
+    ctx.status = 204
 })
 
 router.get('/accounts/:accountId/nfts/:symbol', async (ctx) => {
