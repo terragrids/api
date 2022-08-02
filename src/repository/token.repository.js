@@ -25,12 +25,12 @@ export default class TokenRepository extends DynamoDbRepository {
             id: assetId,
             symbol: data.Item.symbol.S,
             offchainUrl: data.Item.offchainUrl.S,
-            ...data.Item.applicationId && { contractId: data.Item.applicationId.S },
-            ...data.Item.contractInfo && { contractInfo: data.Item.contractInfo.S },
-            ...data.Item.sellerAddress && { sellerAddress: data.Item.sellerAddress.S },
-            ...data.Item.assetPrice && { assetPrice: data.Item.assetPrice.S },
-            ...data.Item.assetPriceUnit && { assetPriceUnit: data.Item.assetPriceUnit.S },
-            ...data.Item.verified && { verified: data.Item.verified.BOOL }
+            ...data.Item.applicationId && data.Item.applicationId.S && { contractId: data.Item.applicationId.S },
+            ...data.Item.contractInfo && data.Item.contractInfo.S && { contractInfo: data.Item.contractInfo.S },
+            ...data.Item.sellerAddress && data.Item.sellerAddress.S && { sellerAddress: data.Item.sellerAddress.S },
+            ...data.Item.assetPrice && data.Item.assetPrice.S && { assetPrice: data.Item.assetPrice.S },
+            ...data.Item.assetPriceUnit && data.Item.assetPriceUnit.S && { assetPriceUnit: data.Item.assetPriceUnit.S },
+            ...data.Item.verified && data.Item.applicationId && data.Item.applicationId.S && { verified: data.Item.verified.BOOL }
         } : null
     }
 
@@ -57,16 +57,16 @@ export default class TokenRepository extends DynamoDbRepository {
         })
     }
 
-    async deleteTokenContract({ assetId }) {
+    async deleteTokenContract(assetId) {
         return await this.update({
             key: { pk: { S: `${this.pkPrefix}|${assetId}` } },
             attributes: {
-                applicationId: null,
-                contractInfo: null,
-                sellerAddress: null,
-                assetPrice: null,
-                assetPriceUnit: null,
-                verified: null
+                applicationId: { S: '' },
+                contractInfo: { S: '' },
+                sellerAddress: { S: '' },
+                assetPrice: { S: '' },
+                assetPriceUnit: { S: '' },
+                verified: { BOOL: false }
             },
             condition: 'attribute_exists(pk)',
             itemLogName: this.itemName
