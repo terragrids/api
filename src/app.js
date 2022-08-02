@@ -14,6 +14,7 @@ import ApplicationStillRunningError from './error/application-still-running.erro
 import IpfsRepository from './repository/ipfs.repository.js'
 import S3Repository from './repository/s3.repository.js'
 import { filterAlgoAssetsByDbAssets } from './utils/assets.js'
+import { ConditionalCheckFailedException } from '@aws-sdk/client-dynamodb'
 
 dotenv.config()
 export const app = new Koa()
@@ -180,7 +181,7 @@ router.get('/nfts/:assetId', async (ctx) => {
                 name: asset.params.name,
                 symbol: asset.params['unit-name'],
                 url: asset.params.url,
-                offchainUrl: offchainInfo.offchainUrl,
+                ...offchainInfo,
                 holders: balances
                     .filter(balance => balance.amount > 0 && !balance.deleted)
                     .map(balance => ({
@@ -211,6 +212,75 @@ router.get('/nfts/type/:symbol', async (ctx) => {
 
     const assets = filterAlgoAssetsByDbAssets(algoAssets, dbAssets)
     ctx.body = { assets }
+})
+
+router.post('/nfts/:assetId/contracts/:applicationId', bodyparser(), async (ctx) => {
+    if (!ctx.request.body.contractInfo) throw new MissingParameterError('contractInfo')
+    if (!ctx.request.body.sellerAddress) throw new MissingParameterError('sellerAddress')
+    if (!ctx.request.body.assetPrice) throw new MissingParameterError('assetPrice')
+    if (!ctx.request.body.assetPriceUnit) throw new MissingParameterError('assetPriceUnit')
+
+    // const algoIndexer = new AlgoIndexer()
+    // const [assetResponse, appResponse] = await Promise.all([
+    //     algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}`),
+    //     algoIndexer.callAlgonodeIndexerEndpoint(`applications/${ctx.params.applicationId}`)
+    // ])
+
+    // if (assetResponse.status !== 200 || !assetResponse.json.asset || assetResponse.json.asset.params['unit-name'] !== 'TRCL') {
+    //     throw new AssetNotFoundError()
+    // }
+
+    // let contractVerified = true
+    // if (appResponse.status !== 200 || appResponse.json.application.params['approval-program'] !== process.env.ALGO_APP_APPROVAL) {
+    //     contractVerified = false
+    // }
+
+    const contractVerified = false
+
+    try {
+        await new TokenRepository().putTokenContract({
+            assetId: ctx.params.assetId,
+            applicationId: ctx.params.applicationId,
+            contractInfo: ctx.request.body.contractInfo,
+            verified: contractVerified,
+            sellerAddress: ctx.request.body.sellerAddress,
+            assetPrice: ctx.request.body.assetPrice.toString(),
+            assetPriceUnit: ctx.request.body.assetPriceUnit
+        })
+    } catch (e) {
+        if (e instanceof ConditionalCheckFailedException) throw new AssetNotFoundError()
+        else throw e
+    }
+
+    ctx.body = { contractVerified }
+    ctx.status = 201
+})
+
+router.delete('/nfts/:assetId/contracts/:applicationId', async (ctx) => {
+    // const algoIndexer = new AlgoIndexer()
+    // const [assetResponse, appResponse] = await Promise.all([
+    //     algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}`),
+    //     algoIndexer.callAlgonodeIndexerEndpoint(`applications/${ctx.params.applicationId}`)
+    // ])
+
+    // const validAsset = assetResponse.json.asset && (
+    //     assetResponse.json.asset.params['unit-name'] !== 'TRCL' ||
+    //     assetResponse.json.asset.params['unit-name'] !== 'TRLD' ||
+    //     assetResponse.json.asset.params['unit-name'] !== 'TRAS'
+    // )
+
+    // if (assetResponse.status !== 200 || !assetResponse.json.asset || assetResponse.json.asset.params['unit-name'] !== 'TRCL') {
+    //     throw new AssetNotFoundError()
+    // }
+
+    // if (appResponse.status === 200 && appResponse.json.application.id === `${ctx.params.applicationId}`) {
+    //     throw new ApplicationStillRunningError()
+    // }
+
+    await new TokenRepository().deleteTokenContract(ctx.params.assetId)
+
+    ctx.body = ''
+    ctx.status = 204
 })
 
 router.delete('/nfts/:assetId', async (ctx) => {

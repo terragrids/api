@@ -1,4 +1,4 @@
-import { ConditionalCheckFailedException, DeleteItemCommand, DynamoDBClient, GetItemCommand, PutItemCommand, QueryCommand } from '@aws-sdk/client-dynamodb'
+import { ConditionalCheckFailedException, DeleteItemCommand, DynamoDBClient, GetItemCommand, PutItemCommand, QueryCommand, UpdateItemCommand } from '@aws-sdk/client-dynamodb'
 import AssetContractNotFoundError from '../error/asset-contract-not-found.error.js'
 import AssetNotFoundError from '../error/asset-not-found.error.js'
 import RepositoryError from '../error/repository.error.js'
@@ -62,6 +62,52 @@ export default class DynamoDbRepository {
             return await this.client.send(command)
         } catch (e) {
             throw new RepositoryError(e, `Unable to put ${itemLogName}`)
+        }
+    }
+
+    async update({ key, condition, attributes, itemLogName = 'item' }) {
+        const { updateExpression, attributeNames, attributeValues } = this.buildUpdate(attributes)
+        const params = {
+            TableName: this.table,
+            Key: key,
+            UpdateExpression: updateExpression,
+            ExpressionAttributeNames: attributeNames,
+            ExpressionAttributeValues: attributeValues,
+            ...condition && { ConditionExpression: condition }
+        }
+
+        const command = new UpdateItemCommand(params)
+
+        try {
+            return await this.client.send(command)
+        } catch (e) {
+            if (e instanceof ConditionalCheckFailedException) throw e
+            throw new RepositoryError(e, `Unable to update ${itemLogName}`)
+        }
+    }
+
+    buildUpdate(attributes) {
+        const updateExpression = []
+        const attributeValues = {}
+        let attributeNames
+
+        for (const [key, value] of Object.entries(attributes)) {
+            if (value !== undefined) {
+                let placeholder = key
+                if (key.startsWith('#')) {
+                    placeholder = key.substring(1)
+                    if (!attributeNames) attributeNames = {}
+                    attributeNames[key] = placeholder
+                }
+                updateExpression.push(`${key} = :${placeholder}`)
+                attributeValues[`:${placeholder}`] = value
+            }
+        }
+
+        return {
+            updateExpression: updateExpression.length > 0 ? `set ${updateExpression.join(',')}` : null,
+            attributeNames,
+            attributeValues
         }
     }
 
