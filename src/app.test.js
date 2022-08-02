@@ -11,11 +11,13 @@ jest.mock('./network/algo-indexer.js', () => jest.fn().mockImplementation(() => 
 })))
 
 const mockTokenRepository = {
+    getToken: jest.fn().mockImplementation(() => jest.fn()),
     getTokenContract: jest.fn().mockImplementation(() => jest.fn()),
     putTokenContract: jest.fn().mockImplementation(() => jest.fn()),
     deleteTokenContract: jest.fn().mockImplementation(() => jest.fn())
 }
 jest.mock('./repository/token.repository.js', () => jest.fn().mockImplementation(() => ({
+    getToken: mockTokenRepository.getToken,
     getTokenContract: mockTokenRepository.getTokenContract,
     putTokenContract: mockTokenRepository.putTokenContract,
     deleteTokenContract: mockTokenRepository.deleteTokenContract
@@ -187,7 +189,7 @@ describe('app', function () {
                 }
             }))
 
-            const response = await request(app.callback()).get('/nfts/symbol')
+            const response = await request(app.callback()).get('/nfts/type/symbol')
 
             expect(mockAlgoIndexer.callRandLabsIndexerEndpoint).toHaveBeenCalledTimes(1)
             expect(mockAlgoIndexer.callRandLabsIndexerEndpoint).toHaveBeenCalledWith('assets?unit=SYMBOL')
@@ -255,7 +257,9 @@ describe('app', function () {
                 }
             }))
 
-            const response = await request(app.callback()).get('/nfts/trcl')
+            mockTokenRepository.getToken.mockImplementation(assetId => Promise.resolve({ id: assetId }))
+
+            const response = await request(app.callback()).get('/nfts/type/trcl')
 
             expect(mockAlgoIndexer.callRandLabsIndexerEndpoint).toHaveBeenCalledTimes(1)
             expect(mockAlgoIndexer.callRandLabsIndexerEndpoint).toHaveBeenCalledWith('assets?unit=TRCL')
@@ -273,6 +277,155 @@ describe('app', function () {
                     symbol: 'TRCL',
                     url: 'https://terragrids.org#5'
                 }]
+            })
+        })
+
+        it('should return 200 when calling nft type endpoint and some assets found in db', async () => {
+            mockAlgoIndexer.callRandLabsIndexerEndpoint.mockImplementation(() => Promise.resolve({
+                status: 200,
+                json: {
+                    assets: [{
+                        index: 1,
+                        deleted: false,
+                        params: {
+                            decimals: 0,
+                            name: 'Terracell #1',
+                            total: 1,
+                            'unit-name': 'TRCL',
+                            url: 'https://terragrids.org#1'
+                        }
+                    }, {
+                        index: 2,
+                        deleted: true,
+                        params: {
+                            decimals: 0,
+                            name: 'Terracell #2',
+                            total: 1,
+                            'unit-name': 'TRCL',
+                            url: 'https://terragrids.org#2'
+                        }
+                    },
+                    {
+                        index: 3,
+                        deleted: false,
+                        params: {
+                            decimals: 1,
+                            name: 'Terracell #3',
+                            total: 1,
+                            'unit-name': 'TRCL',
+                            url: 'https://terragrids.org#3'
+                        }
+                    }, {
+                        index: 4,
+                        deleted: false,
+                        params: {
+                            decimals: 0,
+                            name: 'Terracell #4',
+                            total: 100,
+                            'unit-name': 'TRCL',
+                            url: 'https://terragrids.org#4'
+                        }
+                    }, {
+                        index: 5,
+                        deleted: false,
+                        params: {
+                            decimals: 0,
+                            name: 'Terracell #5',
+                            total: 1,
+                            'unit-name': 'TRCL',
+                            url: 'https://terragrids.org#5'
+                        }
+                    }]
+                }
+            }))
+
+            mockTokenRepository.getToken.mockImplementation(() => Promise.resolve({ id: 1 }))
+
+            const response = await request(app.callback()).get('/nfts/type/trcl')
+
+            expect(mockAlgoIndexer.callRandLabsIndexerEndpoint).toHaveBeenCalledTimes(1)
+            expect(mockAlgoIndexer.callRandLabsIndexerEndpoint).toHaveBeenCalledWith('assets?unit=TRCL')
+
+            expect(response.status).toBe(200)
+            expect(response.body).toEqual({
+                assets: [{
+                    id: 1,
+                    name: 'Terracell #1',
+                    symbol: 'TRCL',
+                    url: 'https://terragrids.org#1'
+                }]
+            })
+        })
+
+        it('should return 200 when calling nft type endpoint and no assets found in db', async () => {
+            mockAlgoIndexer.callRandLabsIndexerEndpoint.mockImplementation(() => Promise.resolve({
+                status: 200,
+                json: {
+                    assets: [{
+                        index: 1,
+                        deleted: false,
+                        params: {
+                            decimals: 0,
+                            name: 'Terracell #1',
+                            total: 1,
+                            'unit-name': 'TRCL',
+                            url: 'https://terragrids.org#1'
+                        }
+                    }, {
+                        index: 2,
+                        deleted: true,
+                        params: {
+                            decimals: 0,
+                            name: 'Terracell #2',
+                            total: 1,
+                            'unit-name': 'TRCL',
+                            url: 'https://terragrids.org#2'
+                        }
+                    },
+                    {
+                        index: 3,
+                        deleted: false,
+                        params: {
+                            decimals: 1,
+                            name: 'Terracell #3',
+                            total: 1,
+                            'unit-name': 'TRCL',
+                            url: 'https://terragrids.org#3'
+                        }
+                    }, {
+                        index: 4,
+                        deleted: false,
+                        params: {
+                            decimals: 0,
+                            name: 'Terracell #4',
+                            total: 100,
+                            'unit-name': 'TRCL',
+                            url: 'https://terragrids.org#4'
+                        }
+                    }, {
+                        index: 5,
+                        deleted: false,
+                        params: {
+                            decimals: 0,
+                            name: 'Terracell #5',
+                            total: 1,
+                            'unit-name': 'TRCL',
+                            url: 'https://terragrids.org#5'
+                        }
+                    }]
+                }
+            }))
+
+            mockTokenRepository.getToken.mockImplementation(() => Promise.resolve({}))
+
+            const response = await request(app.callback()).get('/nfts/type/trcl')
+
+            expect(mockAlgoIndexer.callRandLabsIndexerEndpoint).toHaveBeenCalledTimes(1)
+            expect(mockAlgoIndexer.callRandLabsIndexerEndpoint).toHaveBeenCalledWith('assets?unit=TRCL')
+
+            expect(response.status).toBe(200)
+            expect(response.body).toEqual({
+                assets: []
             })
         })
     })
