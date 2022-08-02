@@ -13,12 +13,14 @@ jest.mock('./network/algo-indexer.js', () => jest.fn().mockImplementation(() => 
 const mockTokenRepository = {
     getToken: jest.fn().mockImplementation(() => jest.fn()),
     putToken: jest.fn().mockImplementation(() => jest.fn()),
+    deleteToken: jest.fn().mockImplementation(() => jest.fn()),
     putTokenContract: jest.fn().mockImplementation(() => jest.fn()),
     deleteTokenContract: jest.fn().mockImplementation(() => jest.fn())
 }
 jest.mock('./repository/token.repository.js', () => jest.fn().mockImplementation(() => ({
     getToken: mockTokenRepository.getToken,
     putToken: mockTokenRepository.putToken,
+    deleteToken: mockTokenRepository.deleteToken,
     putTokenContract: mockTokenRepository.putTokenContract,
     deleteTokenContract: mockTokenRepository.deleteTokenContract
 })))
@@ -1655,6 +1657,17 @@ describe('app', function () {
             expect(response.body).toEqual({
                 assets: []
             })
+        })
+    })
+
+    describe('delete nfts endpoint', function () {
+        it('should return 204 when deleting nft', async () => {
+            const response = await request(app.callback()).delete('/nfts/123')
+
+            expect(mockTokenRepository.deleteToken).toHaveBeenCalledTimes(1)
+            expect(mockTokenRepository.deleteToken).toHaveBeenCalledWith('123')
+
+            expect(response.status).toBe(204)
         })
     })
 

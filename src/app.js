@@ -214,6 +214,12 @@ router.get('/nfts/type/:symbol', async (ctx) => {
     ctx.body = { assets }
 })
 
+router.delete('/nfts/:assetId', async (ctx) => {
+    await new TokenRepository().deleteToken(ctx.params.assetId)
+    ctx.body = ''
+    ctx.status = 204
+})
+
 /* istanbul ignore next */
 router.post('/nfts/:assetId/contracts/:applicationId', bodyparser(), async (ctx) => {
     if (!ctx.request.body.contractInfo) throw new MissingParameterError('contractInfo')
@@ -280,14 +286,6 @@ router.delete('/nfts/:assetId/contracts/:applicationId', async (ctx) => {
     // }
 
     await new TokenRepository().deleteTokenContract(ctx.params.assetId)
-
-    ctx.body = ''
-    ctx.status = 204
-})
-
-/* istanbul ignore next */
-router.delete('/nfts/:assetId', async (ctx) => {
-    await new TokenRepository().deleteToken(ctx.params.assetId)
 
     ctx.body = ''
     ctx.status = 204
