@@ -128,7 +128,7 @@ router.delete('/terracells/:assetId/contracts/:applicationId', async (ctx) => {
         throw new ApplicationStillRunningError()
     }
 
-    await new TokenRepository().deleteToken(ctx.params.assetId)
+    await new TokenRepository().deleteTokenContract(ctx.params.assetId)
 
     ctx.body = ''
     ctx.status = 204

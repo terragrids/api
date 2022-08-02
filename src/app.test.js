@@ -12,13 +12,11 @@ jest.mock('./network/algo-indexer.js', () => jest.fn().mockImplementation(() => 
 
 const mockTokenRepository = {
     getToken: jest.fn().mockImplementation(() => jest.fn()),
-    getTokenContract: jest.fn().mockImplementation(() => jest.fn()),
     putTokenContract: jest.fn().mockImplementation(() => jest.fn()),
     deleteTokenContract: jest.fn().mockImplementation(() => jest.fn())
 }
 jest.mock('./repository/token.repository.js', () => jest.fn().mockImplementation(() => ({
     getToken: mockTokenRepository.getToken,
-    getTokenContract: mockTokenRepository.getTokenContract,
     putTokenContract: mockTokenRepository.putTokenContract,
     deleteTokenContract: mockTokenRepository.deleteTokenContract
 })))
@@ -175,6 +173,271 @@ describe('app', function () {
                     name: 'Terracell #5',
                     symbol: 'TRCL',
                     url: 'https://terragrids.org#5'
+                }]
+            })
+        })
+    })
+
+    describe('get terracell endpoint', function () {
+        it('should return 200 when calling terracell endpoint when assets found with no token contract', async () => {
+            mockAlgoIndexer.callAlgonodeIndexerEndpoint.mockImplementation(params => {
+                switch (params) {
+                    case 'assets/123':
+                        return Promise.resolve({
+                            status: 200,
+                            json: {
+                                asset: {
+                                    index: 123,
+                                    params: {
+                                        name: 'Terracell #1',
+                                        total: 1,
+                                        decimals: 0,
+                                        'unit-name': 'TRCL',
+                                        url: 'https://terragrids.org#1'
+                                    }
+                                }
+                            }
+                        })
+                    case 'assets/123/balances':
+                        return Promise.resolve({
+                            status: 200,
+                            json: {
+                                balances: [{
+                                    address: 'test_address_1',
+                                    amount: 1,
+                                    deleted: false
+                                }, {
+                                    address: 'test_address_2',
+                                    amount: 0,
+                                    deleted: false
+                                }, {
+                                    address: 'test_address_3',
+                                    amount: 1,
+                                    deleted: true
+                                }, {
+                                    address: 'test_address_4',
+                                    amount: 1,
+                                    deleted: false
+                                }]
+                            }
+                        })
+                }
+            })
+
+            const response = await request(app.callback()).get('/terracells/123')
+
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledTimes(2)
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/123')
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/123/balances')
+
+            expect(response.status).toBe(200)
+            expect(response.body).toEqual({
+                asset: {
+                    id: 123,
+                    name: 'Terracell #1',
+                    symbol: 'TRCL',
+                    url: 'https://terragrids.org#1',
+                    holders: [{
+                        address: 'test_address_1',
+                        amount: 1
+                    }, {
+                        address: 'test_address_4',
+                        amount: 1
+                    }]
+                }
+            })
+        })
+
+        it('should return 200 when calling terracell endpoint when assets found with token contract', async () => {
+            mockTokenRepository.getToken.mockImplementation(() => Promise.resolve({
+                id: 'contract_id'
+            }))
+            mockAlgoIndexer.callAlgonodeIndexerEndpoint.mockImplementation(params => {
+                switch (params) {
+                    case 'assets/123':
+                        return Promise.resolve({
+                            status: 200,
+                            json: {
+                                asset: {
+                                    index: 123,
+                                    params: {
+                                        name: 'Terracell #1',
+                                        total: 1,
+                                        decimals: 0,
+                                        'unit-name': 'TRCL',
+                                        url: 'https://terragrids.org#1'
+                                    }
+                                }
+                            }
+                        })
+                    case 'assets/123/balances':
+                        return Promise.resolve({
+                            status: 200,
+                            json: {
+                                balances: [{
+                                    address: 'test_address_1',
+                                    amount: 1,
+                                    deleted: false
+                                }, {
+                                    address: 'test_address_2',
+                                    amount: 0,
+                                    deleted: false
+                                }, {
+                                    address: 'test_address_3',
+                                    amount: 1,
+                                    deleted: true
+                                }, {
+                                    address: 'test_address_4',
+                                    amount: 1,
+                                    deleted: false
+                                }]
+                            }
+                        })
+                }
+            })
+
+            const response = await request(app.callback()).get('/terracells/123')
+
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledTimes(2)
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/123')
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/123/balances')
+
+            expect(mockTokenRepository.getToken).toHaveBeenCalledTimes(1)
+            expect(mockTokenRepository.getToken).toHaveBeenCalledWith('123')
+
+            expect(response.status).toBe(200)
+            expect(response.body).toEqual({
+                asset: {
+                    id: 123,
+                    name: 'Terracell #1',
+                    symbol: 'TRCL',
+                    url: 'https://terragrids.org#1',
+                    holders: [{
+                        address: 'test_address_1',
+                        amount: 1
+                    }, {
+                        address: 'test_address_4',
+                        amount: 1
+                    }],
+                    contract: {
+                        id: 'contract_id'
+                    }
+                }
+            })
+        })
+
+        it('should return 404 when calling terracell endpoint when assets not found', async () => {
+            mockTokenRepository.getToken.mockImplementation(() => Promise.resolve({
+                id: 'contract_id'
+            }))
+            mockAlgoIndexer.callAlgonodeIndexerEndpoint.mockImplementation(params => {
+                switch (params) {
+                    case 'assets/123':
+                        return Promise.resolve({
+                            status: 404
+                        })
+                    case 'assets/123/balances':
+                        return Promise.resolve({})
+                }
+            })
+
+            const response = await request(app.callback()).get('/terracells/123')
+
+            expect(response.status).toBe(404)
+            expect(response.body).toEqual({
+                error: 'AssetNotFoundError',
+                message: 'Asset specified not found'
+            })
+        })
+    })
+
+    describe('get account terracells endpoint', function () {
+        it('should return 200 when calling account terracells endpoint and no assets found', async () => {
+            mockAlgoIndexer.callRandLabsIndexerEndpoint.mockImplementation(() => Promise.resolve({
+                status: 404
+            }))
+
+            const response = await request(app.callback()).get('/accounts/123/terracells')
+
+            expect(mockAlgoIndexer.callRandLabsIndexerEndpoint).toHaveBeenCalledTimes(1)
+            expect(mockAlgoIndexer.callRandLabsIndexerEndpoint).toHaveBeenCalledWith('accounts/123/assets')
+
+            expect(response.status).toBe(200)
+            expect(response.body).toEqual({ assets: [] })
+        })
+
+        it('should return 200 when calling account terracells endpoint and assets found', async () => {
+            mockAlgoIndexer.callRandLabsIndexerEndpoint.mockImplementation(() => Promise.resolve({
+                status: 200,
+                json: {
+                    assets: [{
+                        'asset-id': 1,
+                        amount: 1,
+                        decimals: 0,
+                        deleted: false,
+                        'unit-name': 'TRCL',
+                        name: 'Terracell 1'
+                    }, {
+                        'asset-id': 2,
+                        amount: 0,
+                        decimals: 0,
+                        deleted: false,
+                        'unit-name': 'TRCL',
+                        name: 'Terracell 2'
+                    }, {
+                        'asset-id': 3,
+                        amount: 1,
+                        decimals: 0,
+                        deleted: true,
+                        'unit-name': 'TRCL',
+                        name: 'Terracell 3'
+                    }, {
+                        'asset-id': 4,
+                        amount: 2,
+                        decimals: 0,
+                        deleted: false,
+                        'unit-name': 'TRCL',
+                        name: 'Terracell 4'
+                    }, {
+                        'asset-id': 5,
+                        amount: 1,
+                        decimals: 1,
+                        deleted: false,
+                        'unit-name': 'TRCL',
+                        name: 'Terracell 5'
+                    }, {
+                        'asset-id': 6,
+                        amount: 1,
+                        decimals: 0,
+                        deleted: false,
+                        'unit-name': 'meh',
+                        name: 'Terracell 6'
+                    }, {
+                        'asset-id': 7,
+                        amount: 1,
+                        decimals: 0,
+                        deleted: false,
+                        'unit-name': 'TRCL',
+                        name: 'Terracell 7'
+                    }]
+                }
+            }))
+
+            const response = await request(app.callback()).get('/accounts/123/terracells')
+
+            expect(mockAlgoIndexer.callRandLabsIndexerEndpoint).toHaveBeenCalledTimes(1)
+            expect(mockAlgoIndexer.callRandLabsIndexerEndpoint).toHaveBeenCalledWith('accounts/123/assets')
+
+            expect(response.status).toBe(200)
+            expect(response.body).toEqual({
+                assets: [{
+                    id: 1,
+                    name: 'Terracell 1',
+                    symbol: 'TRCL'
+                }, {
+                    id: 7,
+                    name: 'Terracell 7',
+                    symbol: 'TRCL'
                 }]
             })
         })
@@ -430,271 +693,6 @@ describe('app', function () {
         })
     })
 
-    describe('get terracell endpoint', function () {
-        it('should return 200 when calling terracell endpoint when assets found with no token contract', async () => {
-            mockAlgoIndexer.callAlgonodeIndexerEndpoint.mockImplementation(params => {
-                switch (params) {
-                    case 'assets/123':
-                        return Promise.resolve({
-                            status: 200,
-                            json: {
-                                asset: {
-                                    index: 123,
-                                    params: {
-                                        name: 'Terracell #1',
-                                        total: 1,
-                                        decimals: 0,
-                                        'unit-name': 'TRCL',
-                                        url: 'https://terragrids.org#1'
-                                    }
-                                }
-                            }
-                        })
-                    case 'assets/123/balances':
-                        return Promise.resolve({
-                            status: 200,
-                            json: {
-                                balances: [{
-                                    address: 'test_address_1',
-                                    amount: 1,
-                                    deleted: false
-                                }, {
-                                    address: 'test_address_2',
-                                    amount: 0,
-                                    deleted: false
-                                }, {
-                                    address: 'test_address_3',
-                                    amount: 1,
-                                    deleted: true
-                                }, {
-                                    address: 'test_address_4',
-                                    amount: 1,
-                                    deleted: false
-                                }]
-                            }
-                        })
-                }
-            })
-
-            const response = await request(app.callback()).get('/terracells/123')
-
-            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledTimes(2)
-            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/123')
-            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/123/balances')
-
-            expect(response.status).toBe(200)
-            expect(response.body).toEqual({
-                asset: {
-                    id: 123,
-                    name: 'Terracell #1',
-                    symbol: 'TRCL',
-                    url: 'https://terragrids.org#1',
-                    holders: [{
-                        address: 'test_address_1',
-                        amount: 1
-                    }, {
-                        address: 'test_address_4',
-                        amount: 1
-                    }]
-                }
-            })
-        })
-
-        it('should return 200 when calling terracell endpoint when assets found with token contract', async () => {
-            mockTokenRepository.getTokenContract.mockImplementation(() => Promise.resolve({
-                id: 'contract_id'
-            }))
-            mockAlgoIndexer.callAlgonodeIndexerEndpoint.mockImplementation(params => {
-                switch (params) {
-                    case 'assets/123':
-                        return Promise.resolve({
-                            status: 200,
-                            json: {
-                                asset: {
-                                    index: 123,
-                                    params: {
-                                        name: 'Terracell #1',
-                                        total: 1,
-                                        decimals: 0,
-                                        'unit-name': 'TRCL',
-                                        url: 'https://terragrids.org#1'
-                                    }
-                                }
-                            }
-                        })
-                    case 'assets/123/balances':
-                        return Promise.resolve({
-                            status: 200,
-                            json: {
-                                balances: [{
-                                    address: 'test_address_1',
-                                    amount: 1,
-                                    deleted: false
-                                }, {
-                                    address: 'test_address_2',
-                                    amount: 0,
-                                    deleted: false
-                                }, {
-                                    address: 'test_address_3',
-                                    amount: 1,
-                                    deleted: true
-                                }, {
-                                    address: 'test_address_4',
-                                    amount: 1,
-                                    deleted: false
-                                }]
-                            }
-                        })
-                }
-            })
-
-            const response = await request(app.callback()).get('/terracells/123')
-
-            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledTimes(2)
-            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/123')
-            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/123/balances')
-
-            expect(mockTokenRepository.getTokenContract).toHaveBeenCalledTimes(1)
-            expect(mockTokenRepository.getTokenContract).toHaveBeenCalledWith('123')
-
-            expect(response.status).toBe(200)
-            expect(response.body).toEqual({
-                asset: {
-                    id: 123,
-                    name: 'Terracell #1',
-                    symbol: 'TRCL',
-                    url: 'https://terragrids.org#1',
-                    holders: [{
-                        address: 'test_address_1',
-                        amount: 1
-                    }, {
-                        address: 'test_address_4',
-                        amount: 1
-                    }],
-                    contract: {
-                        id: 'contract_id'
-                    }
-                }
-            })
-        })
-
-        it('should return 404 when calling terracell endpoint when assets not found', async () => {
-            mockTokenRepository.getTokenContract.mockImplementation(() => Promise.resolve({
-                id: 'contract_id'
-            }))
-            mockAlgoIndexer.callAlgonodeIndexerEndpoint.mockImplementation(params => {
-                switch (params) {
-                    case 'assets/123':
-                        return Promise.resolve({
-                            status: 404
-                        })
-                    case 'assets/123/balances':
-                        return Promise.resolve({})
-                }
-            })
-
-            const response = await request(app.callback()).get('/terracells/123')
-
-            expect(response.status).toBe(404)
-            expect(response.body).toEqual({
-                error: 'AssetNotFoundError',
-                message: 'Asset specified not found'
-            })
-        })
-    })
-
-    describe('get account terracells endpoint', function () {
-        it('should return 200 when calling account terracells endpoint and no assets found', async () => {
-            mockAlgoIndexer.callRandLabsIndexerEndpoint.mockImplementation(() => Promise.resolve({
-                status: 404
-            }))
-
-            const response = await request(app.callback()).get('/accounts/123/terracells')
-
-            expect(mockAlgoIndexer.callRandLabsIndexerEndpoint).toHaveBeenCalledTimes(1)
-            expect(mockAlgoIndexer.callRandLabsIndexerEndpoint).toHaveBeenCalledWith('accounts/123/assets')
-
-            expect(response.status).toBe(200)
-            expect(response.body).toEqual({ assets: [] })
-        })
-
-        it('should return 200 when calling account terracells endpoint and assets found', async () => {
-            mockAlgoIndexer.callRandLabsIndexerEndpoint.mockImplementation(() => Promise.resolve({
-                status: 200,
-                json: {
-                    assets: [{
-                        'asset-id': 1,
-                        amount: 1,
-                        decimals: 0,
-                        deleted: false,
-                        'unit-name': 'TRCL',
-                        name: 'Terracell 1'
-                    }, {
-                        'asset-id': 2,
-                        amount: 0,
-                        decimals: 0,
-                        deleted: false,
-                        'unit-name': 'TRCL',
-                        name: 'Terracell 2'
-                    }, {
-                        'asset-id': 3,
-                        amount: 1,
-                        decimals: 0,
-                        deleted: true,
-                        'unit-name': 'TRCL',
-                        name: 'Terracell 3'
-                    }, {
-                        'asset-id': 4,
-                        amount: 2,
-                        decimals: 0,
-                        deleted: false,
-                        'unit-name': 'TRCL',
-                        name: 'Terracell 4'
-                    }, {
-                        'asset-id': 5,
-                        amount: 1,
-                        decimals: 1,
-                        deleted: false,
-                        'unit-name': 'TRCL',
-                        name: 'Terracell 5'
-                    }, {
-                        'asset-id': 6,
-                        amount: 1,
-                        decimals: 0,
-                        deleted: false,
-                        'unit-name': 'meh',
-                        name: 'Terracell 6'
-                    }, {
-                        'asset-id': 7,
-                        amount: 1,
-                        decimals: 0,
-                        deleted: false,
-                        'unit-name': 'TRCL',
-                        name: 'Terracell 7'
-                    }]
-                }
-            }))
-
-            const response = await request(app.callback()).get('/accounts/123/terracells')
-
-            expect(mockAlgoIndexer.callRandLabsIndexerEndpoint).toHaveBeenCalledTimes(1)
-            expect(mockAlgoIndexer.callRandLabsIndexerEndpoint).toHaveBeenCalledWith('accounts/123/assets')
-
-            expect(response.status).toBe(200)
-            expect(response.body).toEqual({
-                assets: [{
-                    id: 1,
-                    name: 'Terracell 1',
-                    symbol: 'TRCL'
-                }, {
-                    id: 7,
-                    name: 'Terracell 7',
-                    symbol: 'TRCL'
-                }]
-            })
-        })
-    })
-
     describe('get account nft type endpoint', function () {
         it('should return 200 when calling account nft type endpoint and no assets found', async () => {
             mockAlgoIndexer.callRandLabsIndexerEndpoint.mockImplementation(() => Promise.resolve({
@@ -710,7 +708,7 @@ describe('app', function () {
             expect(response.body).toEqual({ assets: [] })
         })
 
-        it('should return 200 when calling account terracells endpoint and assets found', async () => {
+        it('should return 200 when calling account terracells endpoint and db assets found', async () => {
             mockAlgoIndexer.callRandLabsIndexerEndpoint.mockImplementation(() => Promise.resolve({
                 status: 200,
                 json: {
@@ -766,6 +764,8 @@ describe('app', function () {
                     }]
                 }
             }))
+
+            mockTokenRepository.getToken.mockImplementation(assetId => Promise.resolve({ id: assetId }))
 
             const response = await request(app.callback()).get('/accounts/123/nfts/trcl')
 
@@ -783,6 +783,150 @@ describe('app', function () {
                     name: 'Terracell 7',
                     symbol: 'TRCL'
                 }]
+            })
+        })
+
+        it('should return 200 when calling account terracells endpoint and some db assets found', async () => {
+            mockAlgoIndexer.callRandLabsIndexerEndpoint.mockImplementation(() => Promise.resolve({
+                status: 200,
+                json: {
+                    assets: [{
+                        'asset-id': 1,
+                        amount: 1,
+                        decimals: 0,
+                        deleted: false,
+                        'unit-name': 'TRCL',
+                        name: 'Terracell 1'
+                    }, {
+                        'asset-id': 2,
+                        amount: 0,
+                        decimals: 0,
+                        deleted: false,
+                        'unit-name': 'TRCL',
+                        name: 'Terracell 2'
+                    }, {
+                        'asset-id': 3,
+                        amount: 1,
+                        decimals: 0,
+                        deleted: true,
+                        'unit-name': 'TRCL',
+                        name: 'Terracell 3'
+                    }, {
+                        'asset-id': 4,
+                        amount: 2,
+                        decimals: 0,
+                        deleted: false,
+                        'unit-name': 'TRCL',
+                        name: 'Terracell 4'
+                    }, {
+                        'asset-id': 5,
+                        amount: 1,
+                        decimals: 1,
+                        deleted: false,
+                        'unit-name': 'TRCL',
+                        name: 'Terracell 5'
+                    }, {
+                        'asset-id': 6,
+                        amount: 1,
+                        decimals: 0,
+                        deleted: false,
+                        'unit-name': 'meh',
+                        name: 'Terracell 6'
+                    }, {
+                        'asset-id': 7,
+                        amount: 1,
+                        decimals: 0,
+                        deleted: false,
+                        'unit-name': 'TRCL',
+                        name: 'Terracell 7'
+                    }]
+                }
+            }))
+
+            mockTokenRepository.getToken.mockImplementation(() => Promise.resolve({ id: 1 }))
+
+            const response = await request(app.callback()).get('/accounts/123/nfts/trcl')
+
+            expect(mockAlgoIndexer.callRandLabsIndexerEndpoint).toHaveBeenCalledTimes(1)
+            expect(mockAlgoIndexer.callRandLabsIndexerEndpoint).toHaveBeenCalledWith('accounts/123/assets')
+
+            expect(response.status).toBe(200)
+            expect(response.body).toEqual({
+                assets: [{
+                    id: 1,
+                    name: 'Terracell 1',
+                    symbol: 'TRCL'
+                }]
+            })
+        })
+
+        it('should return 200 when calling account terracells endpoint and no db assets found', async () => {
+            mockAlgoIndexer.callRandLabsIndexerEndpoint.mockImplementation(() => Promise.resolve({
+                status: 200,
+                json: {
+                    assets: [{
+                        'asset-id': 1,
+                        amount: 1,
+                        decimals: 0,
+                        deleted: false,
+                        'unit-name': 'TRCL',
+                        name: 'Terracell 1'
+                    }, {
+                        'asset-id': 2,
+                        amount: 0,
+                        decimals: 0,
+                        deleted: false,
+                        'unit-name': 'TRCL',
+                        name: 'Terracell 2'
+                    }, {
+                        'asset-id': 3,
+                        amount: 1,
+                        decimals: 0,
+                        deleted: true,
+                        'unit-name': 'TRCL',
+                        name: 'Terracell 3'
+                    }, {
+                        'asset-id': 4,
+                        amount: 2,
+                        decimals: 0,
+                        deleted: false,
+                        'unit-name': 'TRCL',
+                        name: 'Terracell 4'
+                    }, {
+                        'asset-id': 5,
+                        amount: 1,
+                        decimals: 1,
+                        deleted: false,
+                        'unit-name': 'TRCL',
+                        name: 'Terracell 5'
+                    }, {
+                        'asset-id': 6,
+                        amount: 1,
+                        decimals: 0,
+                        deleted: false,
+                        'unit-name': 'meh',
+                        name: 'Terracell 6'
+                    }, {
+                        'asset-id': 7,
+                        amount: 1,
+                        decimals: 0,
+                        deleted: false,
+                        'unit-name': 'TRCL',
+                        name: 'Terracell 7'
+                    }]
+                }
+            }))
+
+            mockTokenRepository.getToken.mockImplementation(() => Promise.resolve({}))
+
+            const response = await request(app.callback()).get('/accounts/123/nfts/trcl')
+
+            expect(mockAlgoIndexer.callRandLabsIndexerEndpoint).toHaveBeenCalledTimes(1)
+            expect(mockAlgoIndexer.callRandLabsIndexerEndpoint).toHaveBeenCalledWith('accounts/123/assets')
+
+            expect(response.status).toBe(200)
+            expect(response.body).toEqual({
+                assets: []
             })
         })
     })
