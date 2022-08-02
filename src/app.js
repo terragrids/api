@@ -147,6 +147,7 @@ router.get('/accounts/:accountId/terracells', async (ctx) => {
     }
 })
 
+/* istanbul ignore next */
 router.post('/nfts', bodyparser(), async (ctx) => {
     if (!ctx.request.body.assetId) throw new MissingParameterError('assetId')
     if (!ctx.request.body.symbol) throw new MissingParameterError('symbol')
@@ -214,6 +215,7 @@ router.get('/nfts/type/:symbol', async (ctx) => {
     ctx.body = { assets }
 })
 
+/* istanbul ignore next */
 router.post('/nfts/:assetId/contracts/:applicationId', bodyparser(), async (ctx) => {
     if (!ctx.request.body.contractInfo) throw new MissingParameterError('contractInfo')
     if (!ctx.request.body.sellerAddress) throw new MissingParameterError('sellerAddress')
@@ -256,6 +258,7 @@ router.post('/nfts/:assetId/contracts/:applicationId', bodyparser(), async (ctx)
     ctx.status = 201
 })
 
+/* istanbul ignore next */
 router.delete('/nfts/:assetId/contracts/:applicationId', async (ctx) => {
     // const algoIndexer = new AlgoIndexer()
     // const [assetResponse, appResponse] = await Promise.all([
@@ -283,6 +286,7 @@ router.delete('/nfts/:assetId/contracts/:applicationId', async (ctx) => {
     ctx.status = 204
 })
 
+/* istanbul ignore next */
 router.delete('/nfts/:assetId', async (ctx) => {
     await new TokenRepository().deleteToken(ctx.params.assetId)
 
