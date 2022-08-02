@@ -147,7 +147,6 @@ router.get('/accounts/:accountId/terracells', async (ctx) => {
     }
 })
 
-/* istanbul ignore next */
 router.post('/nfts', bodyparser(), async (ctx) => {
     if (!ctx.request.body.assetId) throw new MissingParameterError('assetId')
     if (!ctx.request.body.symbol) throw new MissingParameterError('symbol')

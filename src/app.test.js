@@ -12,11 +12,13 @@ jest.mock('./network/algo-indexer.js', () => jest.fn().mockImplementation(() => 
 
 const mockTokenRepository = {
     getToken: jest.fn().mockImplementation(() => jest.fn()),
+    putToken: jest.fn().mockImplementation(() => jest.fn()),
     putTokenContract: jest.fn().mockImplementation(() => jest.fn()),
     deleteTokenContract: jest.fn().mockImplementation(() => jest.fn())
 }
 jest.mock('./repository/token.repository.js', () => jest.fn().mockImplementation(() => ({
     getToken: mockTokenRepository.getToken,
+    putToken: mockTokenRepository.putToken,
     putTokenContract: mockTokenRepository.putTokenContract,
     deleteTokenContract: mockTokenRepository.deleteTokenContract
 })))
@@ -1652,6 +1654,79 @@ describe('app', function () {
             expect(response.status).toBe(200)
             expect(response.body).toEqual({
                 assets: []
+            })
+        })
+    })
+
+    describe('post nfts endpoint', function () {
+        it('should return 201 when posting nft endpoint', async () => {
+            const response = await request(app.callback())
+                .post('/nfts')
+                .send({
+                    assetId: '123',
+                    symbol: 'SYMB',
+                    offchainUrl: 'offchain_url'
+                })
+
+            expect(mockTokenRepository.putToken).toHaveBeenCalledTimes(1)
+            expect(mockTokenRepository.putToken).toHaveBeenCalledWith({
+                assetId: '123',
+                symbol: 'SYMB',
+                offchainUrl: 'offchain_url'
+            })
+
+            expect(response.status).toBe(201)
+            expect(response.body).toEqual({})
+        })
+
+        it('should return 400 when posting nft endpoint and asset id missing', async () => {
+            const response = await request(app.callback())
+                .post('/nfts')
+                .send({
+                    symbol: 'SYMB',
+                    offchainUrl: 'offchain_url'
+                })
+
+            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(400)
+            expect(response.body).toEqual({
+                error: 'MissingParameterError',
+                message: 'assetId must be specified'
+            })
+        })
+
+        it('should return 400 when posting nft endpoint and asset symbol missing', async () => {
+            const response = await request(app.callback())
+                .post('/nfts')
+                .send({
+                    assetId: '123',
+                    offchainUrl: 'offchain_url'
+                })
+
+            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(400)
+            expect(response.body).toEqual({
+                error: 'MissingParameterError',
+                message: 'symbol must be specified'
+            })
+        })
+
+        it('should return 400 when posting nft endpoint and offchain url missing', async () => {
+            const response = await request(app.callback())
+                .post('/nfts')
+                .send({
+                    assetId: '123',
+                    symbol: 'SYMB'
+                })
+
+            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(400)
+            expect(response.body).toEqual({
+                error: 'MissingParameterError',
+                message: 'offchainUrl must be specified'
             })
         })
     })
