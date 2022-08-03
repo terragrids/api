@@ -13,8 +13,9 @@ import MissingParameterError from './error/missing-parameter.error.js'
 import ApplicationStillRunningError from './error/application-still-running.error.js'
 import IpfsRepository from './repository/ipfs.repository.js'
 import S3Repository from './repository/s3.repository.js'
-import { filterAlgoAssetsByDbAssets } from './utils/assets.js'
+import { filterAlgoAssetsByDbAssets, isValidAsset } from './utils/assets.js'
 import { ConditionalCheckFailedException } from '@aws-sdk/client-dynamodb'
+import RepositoryError from './error/repository.error.js'
 
 dotenv.config()
 export const app = new Koa()
@@ -220,29 +221,26 @@ router.delete('/nfts/:assetId', async (ctx) => {
     ctx.status = 204
 })
 
-/* istanbul ignore next */
 router.post('/nfts/:assetId/contracts/:applicationId', bodyparser(), async (ctx) => {
     if (!ctx.request.body.contractInfo) throw new MissingParameterError('contractInfo')
     if (!ctx.request.body.sellerAddress) throw new MissingParameterError('sellerAddress')
     if (!ctx.request.body.assetPrice) throw new MissingParameterError('assetPrice')
     if (!ctx.request.body.assetPriceUnit) throw new MissingParameterError('assetPriceUnit')
 
-    // const algoIndexer = new AlgoIndexer()
-    // const [assetResponse, appResponse] = await Promise.all([
-    //     algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}`),
-    //     algoIndexer.callAlgonodeIndexerEndpoint(`applications/${ctx.params.applicationId}`)
-    // ])
+    const algoIndexer = new AlgoIndexer()
+    const [assetResponse, appResponse] = await Promise.all([
+        algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}`),
+        algoIndexer.callAlgonodeIndexerEndpoint(`applications/${ctx.params.applicationId}`)
+    ])
 
-    // if (assetResponse.status !== 200 || !assetResponse.json.asset || assetResponse.json.asset.params['unit-name'] !== 'TRCL') {
-    //     throw new AssetNotFoundError()
-    // }
+    if (assetResponse.status !== 200 || !isValidAsset(assetResponse.json.asset)) {
+        throw new AssetNotFoundError()
+    }
 
-    // let contractVerified = true
-    // if (appResponse.status !== 200 || appResponse.json.application.params['approval-program'] !== process.env.ALGO_APP_APPROVAL) {
-    //     contractVerified = false
-    // }
-
-    const contractVerified = false
+    let contractVerified = true
+    if (appResponse.status !== 200 || appResponse.json.application.params['approval-program'] !== process.env.ALGO_APP_APPROVAL) {
+        contractVerified = false
+    }
 
     try {
         await new TokenRepository().putTokenContract({
@@ -256,7 +254,7 @@ router.post('/nfts/:assetId/contracts/:applicationId', bodyparser(), async (ctx)
         })
     } catch (e) {
         if (e instanceof ConditionalCheckFailedException) throw new AssetNotFoundError()
-        else throw e
+        else throw new RepositoryError(e)
     }
 
     ctx.body = { contractVerified }
@@ -285,7 +283,12 @@ router.delete('/nfts/:assetId/contracts/:applicationId', async (ctx) => {
     //     throw new ApplicationStillRunningError()
     // }
 
-    await new TokenRepository().deleteTokenContract(ctx.params.assetId)
+    try {
+        await new TokenRepository().deleteTokenContract(ctx.params.assetId)
+    } catch (e) {
+        if (e instanceof ConditionalCheckFailedException) throw new AssetNotFoundError()
+        else throw new RepositoryError(e)
+    }
 
     ctx.body = ''
     ctx.status = 204

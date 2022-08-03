@@ -1744,6 +1744,380 @@ describe('app', function () {
         })
     })
 
+    describe('post nft contract endpoint', function () {
+        it('should return 201 when calling nft contract endpoint and both nft and application found', async () => {
+            process.env.ALGO_APP_APPROVAL = 'approval_program_value'
+
+            mockAlgoIndexer.callAlgonodeIndexerEndpoint.mockImplementation(params => {
+                switch (params) {
+                    case 'assets/123':
+                        return Promise.resolve({
+                            status: 200,
+                            json: {
+                                asset: {
+                                    index: 123,
+                                    params: {
+                                        name: 'Terracell #1',
+                                        total: 1,
+                                        decimals: 0,
+                                        'unit-name': 'TRCL',
+                                        url: 'https://terragrids.org#1'
+                                    }
+                                }
+                            }
+                        })
+                    case 'applications/456':
+                        return Promise.resolve({
+                            status: 200,
+                            json: {
+                                application: {
+                                    params: {
+                                        'approval-program': 'approval_program_value'
+                                    }
+                                }
+                            }
+                        })
+                }
+            })
+
+            const response = await request(app.callback())
+                .post('/nfts/123/contracts/456')
+                .send({
+                    contractInfo: 'contract_info',
+                    sellerAddress: 'seller_address',
+                    assetPrice: 10,
+                    assetPriceUnit: 'ALGO'
+                })
+
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledTimes(2)
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/123')
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('applications/456')
+
+            expect(mockTokenRepository.putTokenContract).toHaveBeenCalledTimes(1)
+            expect(mockTokenRepository.putTokenContract).toHaveBeenCalledWith({
+                assetId: '123',
+                applicationId: '456',
+                contractInfo: 'contract_info',
+                sellerAddress: 'seller_address',
+                assetPrice: '10',
+                assetPriceUnit: 'ALGO',
+                verified: true
+            })
+
+            expect(response.status).toBe(201)
+            expect(response.body).toEqual({
+                contractVerified: true
+            })
+        })
+
+        it('should return 404 when calling nft contract endpoint and nft not found', async () => {
+            process.env.ALGO_APP_APPROVAL = 'approval_program_value'
+
+            mockAlgoIndexer.callAlgonodeIndexerEndpoint.mockImplementation(params => {
+                switch (params) {
+                    case 'assets/123':
+                        return Promise.resolve({
+                            status: 404
+                        })
+                    case 'applications/456':
+                        return Promise.resolve({
+                            status: 200,
+                            json: {
+                                application: {
+                                    params: {
+                                        'approval-program': 'approval_program_value'
+                                    }
+                                }
+                            }
+                        })
+                }
+            })
+
+            const response = await request(app.callback())
+                .post('/nfts/123/contracts/456')
+                .send({
+                    contractInfo: 'contract_info',
+                    sellerAddress: 'seller_address',
+                    assetPrice: 10,
+                    assetPriceUnit: 'ALGO'
+                })
+
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledTimes(2)
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/123')
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('applications/456')
+
+            expect(mockTokenRepository.putTokenContract).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(404)
+        })
+
+        it('should return 404 when calling nft contract endpoint and asset type not valid', async () => {
+            process.env.ALGO_APP_APPROVAL = 'approval_program_value'
+
+            mockAlgoIndexer.callAlgonodeIndexerEndpoint.mockImplementation(params => {
+                switch (params) {
+                    case 'assets/123':
+                        return Promise.resolve({
+                            status: 200,
+                            json: {
+                                asset: {
+                                    index: 123,
+                                    params: {
+                                        name: 'Terracell #1',
+                                        total: 1,
+                                        decimals: 0,
+                                        'unit-name': 'meh',
+                                        url: 'https://terragrids.org#1'
+                                    }
+                                }
+                            }
+                        })
+                    case 'applications/456':
+                        return Promise.resolve({
+                            status: 200,
+                            json: {
+                                application: {
+                                    params: {
+                                        'approval-program': 'approval_program_value'
+                                    }
+                                }
+                            }
+                        })
+                }
+            })
+
+            const response = await request(app.callback())
+                .post('/nfts/123/contracts/456')
+                .send({
+                    contractInfo: 'contract_info',
+                    sellerAddress: 'seller_address',
+                    assetPrice: 10,
+                    assetPriceUnit: 'ALGO'
+                })
+
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledTimes(2)
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/123')
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('applications/456')
+
+            expect(mockTokenRepository.putTokenContract).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(404)
+        })
+
+        it('should return 404 when calling nft contract endpoint and application not found', async () => {
+            process.env.ALGO_APP_APPROVAL = 'approval_program_value'
+
+            mockAlgoIndexer.callAlgonodeIndexerEndpoint.mockImplementation(params => {
+                switch (params) {
+                    case 'assets/123':
+                        return Promise.resolve({
+                            status: 200,
+                            json: {
+                                asset: {
+                                    index: 123,
+                                    params: {
+                                        name: 'Terracell #1',
+                                        total: 1,
+                                        decimals: 0,
+                                        'unit-name': 'TRCL',
+                                        url: 'https://terragrids.org#1'
+                                    }
+                                }
+                            }
+                        })
+                    case 'applications/456':
+                        return Promise.resolve({
+                            status: 404
+                        })
+                }
+            })
+
+            const response = await request(app.callback())
+                .post('/nfts/123/contracts/456')
+                .send({
+                    contractInfo: 'contract_info',
+                    sellerAddress: 'seller_address',
+                    assetPrice: 10,
+                    assetPriceUnit: 'ALGO'
+                })
+
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledTimes(2)
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/123')
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('applications/456')
+
+            expect(mockTokenRepository.putTokenContract).toHaveBeenCalledTimes(1)
+            expect(mockTokenRepository.putTokenContract).toHaveBeenCalledWith({
+                assetId: '123',
+                applicationId: '456',
+                contractInfo: 'contract_info',
+                sellerAddress: 'seller_address',
+                assetPrice: '10',
+                assetPriceUnit: 'ALGO',
+                verified: false
+            })
+
+            expect(response.status).toBe(201)
+            expect(response.body).toEqual({
+                contractVerified: false
+            })
+        })
+
+        it('should return 404 when calling nfts contract endpoint and application approval program not valid', async () => {
+            process.env.ALGO_APP_APPROVAL = 'approval_program_value'
+
+            mockAlgoIndexer.callAlgonodeIndexerEndpoint.mockImplementation(params => {
+                switch (params) {
+                    case 'assets/123':
+                        return Promise.resolve({
+                            status: 200,
+                            json: {
+                                asset: {
+                                    index: 123,
+                                    params: {
+                                        name: 'Terracell #1',
+                                        total: 1,
+                                        decimals: 0,
+                                        'unit-name': 'TRCL',
+                                        url: 'https://terragrids.org#1'
+                                    }
+                                }
+                            }
+                        })
+                    case 'applications/456':
+                        return Promise.resolve({
+                            status: 200,
+                            json: {
+                                application: {
+                                    params: {
+                                        'approval-program': 'meh'
+                                    }
+                                }
+                            }
+                        })
+                }
+            })
+
+            const response = await request(app.callback())
+                .post('/nfts/123/contracts/456')
+                .send({
+                    contractInfo: 'contract_info',
+                    sellerAddress: 'seller_address',
+                    assetPrice: 10,
+                    assetPriceUnit: 'ALGO'
+                })
+
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledTimes(2)
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/123')
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('applications/456')
+
+            expect(mockTokenRepository.putTokenContract).toHaveBeenCalledTimes(1)
+            expect(mockTokenRepository.putTokenContract).toHaveBeenCalledWith({
+                assetId: '123',
+                applicationId: '456',
+                contractInfo: 'contract_info',
+                sellerAddress: 'seller_address',
+                assetPrice: '10',
+                assetPriceUnit: 'ALGO',
+                verified: false
+            })
+
+            expect(response.status).toBe(201)
+            expect(response.body).toEqual({
+                contractVerified: false
+            })
+        })
+
+        it('should return 400 when calling nft contract endpoint and contract info missing', async () => {
+            const response = await request(app.callback())
+                .post('/nfts/123/contracts/456')
+                .send({
+                    sellerAddress: 'seller_address',
+                    assetPrice: 10,
+                    assetPriceUnit: 'ALGO'
+                })
+
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putTokenContract).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(400)
+            expect(response.body).toEqual({
+                error: 'MissingParameterError',
+                message: 'contractInfo must be specified'
+            })
+        })
+
+        it('should return 400 when calling nft contract endpoint and seller address missing', async () => {
+            const response = await request(app.callback())
+                .post('/nfts/123/contracts/456')
+                .send({
+                    contractInfo: 'contract_info',
+                    assetPrice: 10,
+                    assetPriceUnit: 'ALGO'
+                })
+
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putTokenContract).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(400)
+            expect(response.body).toEqual({
+                error: 'MissingParameterError',
+                message: 'sellerAddress must be specified'
+            })
+        })
+
+        it('should return 400 when calling nft contract endpoint and asset price missing', async () => {
+            const response = await request(app.callback())
+                .post('/nfts/123/contracts/456')
+                .send({
+                    contractInfo: 'contract_info',
+                    sellerAddress: 'seller_address',
+                    assetPriceUnit: 'ALGO'
+                })
+
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putTokenContract).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(400)
+            expect(response.body).toEqual({
+                error: 'MissingParameterError',
+                message: 'assetPrice must be specified'
+            })
+        })
+
+        it('should return 400 when calling nft contract endpoint and asset price unit missing', async () => {
+            const response = await request(app.callback())
+                .post('/nfts/123/contracts/456')
+                .send({
+                    contractInfo: 'contract_info',
+                    sellerAddress: 'seller_address',
+                    assetPrice: 10
+                })
+
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putTokenContract).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(400)
+            expect(response.body).toEqual({
+                error: 'MissingParameterError',
+                message: 'assetPriceUnit must be specified'
+            })
+        })
+
+        it('should return 400 when calling nft contract endpoint and request body missing', async () => {
+            const response = await request(app.callback())
+                .post('/nfts/123/contracts/456')
+
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putTokenContract).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(400)
+            expect(response.body).toEqual({
+                error: 'MissingParameterError',
+                message: 'contractInfo must be specified'
+            })
+        })
+    })
+
     describe('post ipfs files endpoint', function () {
         it('should return 201 when calling ipfs files endpoint and s3 file is found', async () => {
             process.env.ALGO_APP_APPROVAL = 'approval_program_value'

@@ -11,3 +11,11 @@ export function filterAlgoAssetsByDbAssets(algoAssets, dbAssets) {
     }
     return assets
 }
+
+export function isValidAsset(asset) {
+    return asset && (
+        asset.params['unit-name'] === 'TRCL' ||
+        asset.params['unit-name'] === 'TRLD' ||
+        asset.params['unit-name'] === 'TRBD'
+    )
+}
