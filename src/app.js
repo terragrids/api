@@ -14,6 +14,8 @@ import ApplicationStillRunningError from './error/application-still-running.erro
 import IpfsRepository from './repository/ipfs.repository.js'
 import S3Repository from './repository/s3.repository.js'
 import { filterAlgoAssetsByDbAssets, isValidAsset } from './utils/assets.js'
+import { isPositiveNumber } from './utils/validators.js'
+import { TypePositiveNumberError } from './error/type-number.error.js'
 
 dotenv.config()
 export const app = new Koa()
@@ -151,10 +153,19 @@ router.post('/nfts', bodyparser(), async (ctx) => {
     if (!ctx.request.body.symbol) throw new MissingParameterError('symbol')
     if (!ctx.request.body.offchainUrl) throw new MissingParameterError('offchainUrl')
 
+    const symbol = ctx.request.body.symbol.toLowerCase()
+    const power = ctx.request.body.power
+
+    if (symbol === 'trcl') {
+        if (!power) throw new MissingParameterError('power')
+        if (!isPositiveNumber(power)) throw new TypePositiveNumberError('power')
+    }
+
     await new TokenRepository().putToken({
         assetId: ctx.request.body.assetId,
         symbol: ctx.request.body.symbol,
-        offchainUrl: ctx.request.body.offchainUrl
+        offchainUrl: ctx.request.body.offchainUrl,
+        ...symbol === 'trcl' && { power }
     })
 
     ctx.body = ''

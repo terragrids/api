@@ -1,4 +1,4 @@
-import { ConditionalCheckFailedException, DeleteItemCommand, DynamoDBClient, GetItemCommand, PutItemCommand, QueryCommand, UpdateItemCommand } from '@aws-sdk/client-dynamodb'
+import { ConditionalCheckFailedException, DeleteItemCommand, DynamoDBClient, GetItemCommand, PutItemCommand, QueryCommand, TransactWriteItemsCommand, UpdateItemCommand } from '@aws-sdk/client-dynamodb'
 import RepositoryError from '../error/repository.error.js'
 
 export default class DynamoDbRepository {
@@ -122,6 +122,41 @@ export default class DynamoDbRepository {
         } catch (e) {
             if (e instanceof ConditionalCheckFailedException) throw e
             else throw new RepositoryError(e, `Unable to delete ${itemLogName}`)
+        }
+    }
+
+    async transactWrite({ params, itemLogName = 'item' }) {
+        const command = new TransactWriteItemsCommand(params)
+
+        try {
+            return await this.client.send(command)
+        } catch (e) {
+            console.error(e)
+            if (e instanceof ConditionalCheckFailedException) throw e
+            else throw new RepositoryError(e, `Unable to execute transaction on ${itemLogName}`)
+        }
+    }
+
+    getUpdateCountersTnxCommand({ key, counters, conditionExpression }) {
+        return {
+            Update: {
+                TableName: this.table,
+                Key: key,
+                UpdateExpression: `add ${counters.map(c => `${c.name} :${c.name}`).join(',')}`,
+                ExpressionAttributeValues: {
+                    ...counters.reduce((map, counter) => (map[`:${counter.name}`] = { N: counter.change }, map), {})
+                },
+                ...conditionExpression && { ConditionExpression: conditionExpression }
+            }
+        }
+    }
+
+    getPutTnxCommand(item) {
+        return {
+            Put: {
+                TableName: this.table,
+                Item: item
+            }
         }
     }
 }

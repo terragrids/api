@@ -3,16 +3,31 @@ import AssetNotFoundError from '../error/asset-not-found.error.js'
 import DynamoDbRepository from './dynamodb.repository.js'
 
 export default class TokenRepository extends DynamoDbRepository {
-    pkPrefix = 'asset'
+    pkTokenPrefix = 'asset'
+    pkSolarPowerPlantPrefix = 'spp'
     itemName = 'token'
 
-    async putToken({ assetId, symbol, offchainUrl }) {
-        return await this.put({
-            item: {
-                pk: { S: `${this.pkPrefix}|${assetId}` },
-                symbol: { S: symbol },
-                offchainUrl: { S: offchainUrl }
-            },
+    async putToken({ assetId, symbol, offchainUrl, power }) {
+        const params = {
+            TransactItems: [
+                this.getUpdateCountersTnxCommand({
+                    key: { pk: { S: this.pkSolarPowerPlantPrefix } },
+                    counters: [{
+                        name: 'powerCapacity',
+                        change: power
+                    }]
+                }),
+                this.getPutTnxCommand({
+                    pk: { S: `${this.pkTokenPrefix}|${assetId}` },
+                    symbol: { S: symbol },
+                    offchainUrl: { S: offchainUrl },
+                    power: { N: power }
+                })
+            ]
+        }
+
+        return await this.transactWrite({
+            params,
             itemLogName: this.itemName
         })
     }
@@ -20,7 +35,7 @@ export default class TokenRepository extends DynamoDbRepository {
     async getToken(assetId) {
         try {
             const data = await this.get({
-                key: { pk: { S: `${this.pkPrefix}|${assetId}` } },
+                key: { pk: { S: `${this.pkTokenPrefix}|${assetId}` } },
                 itemLogName: this.itemName
             })
 
@@ -45,7 +60,7 @@ export default class TokenRepository extends DynamoDbRepository {
     async deleteToken(assetId) {
         try {
             return await this.delete({
-                key: { pk: { S: `${this.pkPrefix}|${assetId}` } },
+                key: { pk: { S: `${this.pkTokenPrefix}|${assetId}` } },
                 itemLogName: this.itemName
             })
         } catch (e) {
@@ -57,7 +72,7 @@ export default class TokenRepository extends DynamoDbRepository {
     async putTokenContract({ assetId, applicationId, contractInfo, sellerAddress, assetPrice, assetPriceUnit, verified }) {
         try {
             return await this.update({
-                key: { pk: { S: `${this.pkPrefix}|${assetId}` } },
+                key: { pk: { S: `${this.pkTokenPrefix}|${assetId}` } },
                 attributes: {
                     applicationId: { S: applicationId },
                     contractInfo: { S: contractInfo },
@@ -78,7 +93,7 @@ export default class TokenRepository extends DynamoDbRepository {
     async deleteTokenContract(assetId) {
         try {
             return await this.update({
-                key: { pk: { S: `${this.pkPrefix}|${assetId}` } },
+                key: { pk: { S: `${this.pkTokenPrefix}|${assetId}` } },
                 attributes: {
                     applicationId: { S: '' },
                     contractInfo: { S: '' },
