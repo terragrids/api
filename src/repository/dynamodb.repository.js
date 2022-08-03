@@ -1,6 +1,4 @@
 import { ConditionalCheckFailedException, DeleteItemCommand, DynamoDBClient, GetItemCommand, PutItemCommand, QueryCommand, UpdateItemCommand } from '@aws-sdk/client-dynamodb'
-import AssetContractNotFoundError from '../error/asset-contract-not-found.error.js'
-import AssetNotFoundError from '../error/asset-not-found.error.js'
 import RepositoryError from '../error/repository.error.js'
 
 export default class DynamoDbRepository {
@@ -45,7 +43,7 @@ export default class DynamoDbRepository {
         try {
             return await this.client.send(command)
         } catch (e) {
-            if (e instanceof ConditionalCheckFailedException) throw new AssetContractNotFoundError()
+            if (e instanceof ConditionalCheckFailedException) throw e
             throw new RepositoryError(e, `Unable to get ${itemLogName}`)
         }
     }
@@ -122,7 +120,7 @@ export default class DynamoDbRepository {
         try {
             return await this.client.send(command)
         } catch (e) {
-            if (e instanceof ConditionalCheckFailedException) throw new AssetNotFoundError()
+            if (e instanceof ConditionalCheckFailedException) throw e
             else throw new RepositoryError(e, `Unable to delete ${itemLogName}`)
         }
     }

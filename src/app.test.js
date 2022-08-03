@@ -2118,6 +2118,171 @@ describe('app', function () {
         })
     })
 
+    describe('delete nft contract endpoint', function () {
+        it('should return 204 when calling nft contract endpoint and nft found and application not running', async () => {
+            mockAlgoIndexer.callAlgonodeIndexerEndpoint.mockImplementation(params => {
+                switch (params) {
+                    case 'assets/123':
+                        return Promise.resolve({
+                            status: 200,
+                            json: {
+                                asset: {
+                                    index: 123,
+                                    params: {
+                                        name: 'Terracell #1',
+                                        total: 1,
+                                        decimals: 0,
+                                        'unit-name': 'TRCL',
+                                        url: 'https://terragrids.org#1'
+                                    }
+                                }
+                            }
+                        })
+                    case 'applications/456':
+                        return Promise.resolve({
+                            status: 404
+                        })
+                }
+            })
+
+            const response = await request(app.callback()).delete('/nfts/123/contracts/456')
+
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledTimes(2)
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/123')
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('applications/456')
+
+            expect(mockTokenRepository.deleteTokenContract).toHaveBeenCalledTimes(1)
+            expect(mockTokenRepository.deleteTokenContract).toHaveBeenCalledWith('123')
+
+            expect(response.status).toBe(204)
+        })
+
+        it('should return 404 when calling nft contract endpoint and nft not found', async () => {
+            mockAlgoIndexer.callAlgonodeIndexerEndpoint.mockImplementation(params => {
+                switch (params) {
+                    case 'assets/123':
+                        return Promise.resolve({
+                            status: 404
+                        })
+                    case 'applications/456':
+                        return Promise.resolve({
+                            status: 200,
+                            json: {
+                                application: {
+                                    params: {
+                                        'approval-program': 'approval_program_value'
+                                    }
+                                }
+                            }
+                        })
+                }
+            })
+
+            const response = await request(app.callback()).delete('/nfts/123/contracts/456')
+
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledTimes(2)
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/123')
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('applications/456')
+
+            expect(mockTokenRepository.deleteTokenContract).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(404)
+        })
+
+        it('should return 404 when calling nft contract endpoint and asset not valid', async () => {
+            mockAlgoIndexer.callAlgonodeIndexerEndpoint.mockImplementation(params => {
+                switch (params) {
+                    case 'assets/123':
+                        return Promise.resolve({
+                            status: 200,
+                            json: {
+                                asset: {
+                                    index: 123,
+                                    params: {
+                                        name: 'Terracell #1',
+                                        total: 1,
+                                        decimals: 0,
+                                        'unit-name': 'meh',
+                                        url: 'https://terragrids.org#1'
+                                    }
+                                }
+                            }
+                        })
+                    case 'applications/456':
+                        return Promise.resolve({
+                            status: 200,
+                            json: {
+                                application: {
+                                    params: {
+                                        'approval-program': 'approval_program_value'
+                                    }
+                                }
+                            }
+                        })
+                }
+            })
+
+            const response = await request(app.callback()).delete('/nfts/123/contracts/456')
+
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledTimes(2)
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/123')
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('applications/456')
+
+            expect(mockTokenRepository.deleteTokenContract).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(404)
+        })
+
+        it('should return 400 when calling nft contract endpoint and application still running', async () => {
+            mockAlgoIndexer.callAlgonodeIndexerEndpoint.mockImplementation(params => {
+                switch (params) {
+                    case 'assets/123':
+                        return Promise.resolve({
+                            status: 200,
+                            json: {
+                                asset: {
+                                    index: 123,
+                                    params: {
+                                        name: 'Terracell #1',
+                                        total: 1,
+                                        decimals: 0,
+                                        'unit-name': 'TRCL',
+                                        url: 'https://terragrids.org#1'
+                                    }
+                                }
+                            }
+                        })
+                    case 'applications/456':
+                        return Promise.resolve({
+                            status: 200,
+                            json: {
+                                application: {
+                                    id: '456',
+                                    params: {
+                                        'approval-program': 'meh'
+                                    }
+                                }
+                            }
+                        })
+                }
+            })
+
+            const response = await request(app.callback()).delete('/nfts/123/contracts/456')
+
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledTimes(2)
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/123')
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('applications/456')
+
+            expect(mockTokenRepository.deleteTokenContract).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(400)
+            expect(response.body).toEqual({
+                error: 'ApplicationStillRunningError',
+                message: 'Application specified is still running'
+            })
+        })
+    })
+
     describe('post ipfs files endpoint', function () {
         it('should return 201 when calling ipfs files endpoint and s3 file is found', async () => {
             process.env.ALGO_APP_APPROVAL = 'approval_program_value'

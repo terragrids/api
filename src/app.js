@@ -14,8 +14,6 @@ import ApplicationStillRunningError from './error/application-still-running.erro
 import IpfsRepository from './repository/ipfs.repository.js'
 import S3Repository from './repository/s3.repository.js'
 import { filterAlgoAssetsByDbAssets, isValidAsset } from './utils/assets.js'
-import { ConditionalCheckFailedException } from '@aws-sdk/client-dynamodb'
-import RepositoryError from './error/repository.error.js'
 
 dotenv.config()
 export const app = new Koa()
@@ -242,53 +240,36 @@ router.post('/nfts/:assetId/contracts/:applicationId', bodyparser(), async (ctx)
         contractVerified = false
     }
 
-    try {
-        await new TokenRepository().putTokenContract({
-            assetId: ctx.params.assetId,
-            applicationId: ctx.params.applicationId,
-            contractInfo: ctx.request.body.contractInfo,
-            verified: contractVerified,
-            sellerAddress: ctx.request.body.sellerAddress,
-            assetPrice: ctx.request.body.assetPrice.toString(),
-            assetPriceUnit: ctx.request.body.assetPriceUnit
-        })
-    } catch (e) {
-        if (e instanceof ConditionalCheckFailedException) throw new AssetNotFoundError()
-        else throw new RepositoryError(e)
-    }
+    await new TokenRepository().putTokenContract({
+        assetId: ctx.params.assetId,
+        applicationId: ctx.params.applicationId,
+        contractInfo: ctx.request.body.contractInfo,
+        verified: contractVerified,
+        sellerAddress: ctx.request.body.sellerAddress,
+        assetPrice: ctx.request.body.assetPrice.toString(),
+        assetPriceUnit: ctx.request.body.assetPriceUnit
+    })
 
     ctx.body = { contractVerified }
     ctx.status = 201
 })
 
-/* istanbul ignore next */
 router.delete('/nfts/:assetId/contracts/:applicationId', async (ctx) => {
-    // const algoIndexer = new AlgoIndexer()
-    // const [assetResponse, appResponse] = await Promise.all([
-    //     algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}`),
-    //     algoIndexer.callAlgonodeIndexerEndpoint(`applications/${ctx.params.applicationId}`)
-    // ])
+    const algoIndexer = new AlgoIndexer()
+    const [assetResponse, appResponse] = await Promise.all([
+        algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}`),
+        algoIndexer.callAlgonodeIndexerEndpoint(`applications/${ctx.params.applicationId}`)
+    ])
 
-    // const validAsset = assetResponse.json.asset && (
-    //     assetResponse.json.asset.params['unit-name'] !== 'TRCL' ||
-    //     assetResponse.json.asset.params['unit-name'] !== 'TRLD' ||
-    //     assetResponse.json.asset.params['unit-name'] !== 'TRAS'
-    // )
-
-    // if (assetResponse.status !== 200 || !assetResponse.json.asset || assetResponse.json.asset.params['unit-name'] !== 'TRCL') {
-    //     throw new AssetNotFoundError()
-    // }
-
-    // if (appResponse.status === 200 && appResponse.json.application.id === `${ctx.params.applicationId}`) {
-    //     throw new ApplicationStillRunningError()
-    // }
-
-    try {
-        await new TokenRepository().deleteTokenContract(ctx.params.assetId)
-    } catch (e) {
-        if (e instanceof ConditionalCheckFailedException) throw new AssetNotFoundError()
-        else throw new RepositoryError(e)
+    if (assetResponse.status !== 200 || !isValidAsset(assetResponse.json.asset)) {
+        throw new AssetNotFoundError()
     }
+
+    if (appResponse.status === 200 && appResponse.json.application.id === `${ctx.params.applicationId}`) {
+        throw new ApplicationStillRunningError()
+    }
+
+    await new TokenRepository().deleteTokenContract(ctx.params.assetId)
 
     ctx.body = ''
     ctx.status = 204
