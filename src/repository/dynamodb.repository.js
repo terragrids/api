@@ -159,4 +159,13 @@ export default class DynamoDbRepository {
             }
         }
     }
+
+    getDeleteTnxCommand(key) {
+        return {
+            Delete: {
+                TableName: this.table,
+                Key: key
+            }
+        }
+    }
 }

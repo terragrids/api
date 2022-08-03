@@ -48,7 +48,8 @@ export default class TokenRepository extends DynamoDbRepository {
                 ...data.Item.sellerAddress && data.Item.sellerAddress.S && { sellerAddress: data.Item.sellerAddress.S },
                 ...data.Item.assetPrice && data.Item.assetPrice.S && { assetPrice: data.Item.assetPrice.S },
                 ...data.Item.assetPriceUnit && data.Item.assetPriceUnit.S && { assetPriceUnit: data.Item.assetPriceUnit.S },
-                ...data.Item.verified && data.Item.applicationId && data.Item.applicationId.S && { verified: data.Item.verified.BOOL }
+                ...data.Item.verified && data.Item.applicationId && data.Item.applicationId.S && { verified: data.Item.verified.BOOL },
+                ...data.Item.power && data.Item.power.N && { power: data.Item.power.N }
             } : null
 
         } catch (e) {
@@ -58,9 +59,29 @@ export default class TokenRepository extends DynamoDbRepository {
     }
 
     async deleteToken(assetId) {
+        const token = await this.getToken(assetId)
+
+        const params = {
+            TransactItems: [
+                this.getDeleteTnxCommand({
+                    pk: { S: `${this.pkTokenPrefix}|${assetId}` }
+                })
+            ]
+        }
+
+        if (token.symbol.toLowerCase() === 'trcl') {
+            params.TransactItems.push(this.getUpdateCountersTnxCommand({
+                key: { pk: { S: this.pkSolarPowerPlantPrefix } },
+                counters: [{
+                    name: 'powerCapacity',
+                    change: -token.power
+                }]
+            }))
+        }
+
         try {
-            return await this.delete({
-                key: { pk: { S: `${this.pkTokenPrefix}|${assetId}` } },
+            return await this.transactWrite({
+                params,
                 itemLogName: this.itemName
             })
         } catch (e) {
