@@ -1,5 +1,6 @@
 import { ConditionalCheckFailedException } from '@aws-sdk/client-dynamodb'
 import AssetNotFoundError from '../error/asset-not-found.error.js'
+import { TRCL } from '../utils/assets.js'
 import DynamoDbRepository from './dynamodb.repository.js'
 
 export default class TokenRepository extends DynamoDbRepository {
@@ -95,7 +96,7 @@ export default class TokenRepository extends DynamoDbRepository {
             ]
         }
 
-        if (token.symbol.toLowerCase() === 'trcl') {
+        if (token.symbol.toUpperCase() === TRCL) {
             params.TransactItems.push(this.getUpdateCountersTnxCommand({
                 key: { pk: { S: this.pkSolarPowerPlantPrefix } },
                 counters: [{

@@ -13,10 +13,11 @@ import MissingParameterError from './error/missing-parameter.error.js'
 import ApplicationStillRunningError from './error/application-still-running.error.js'
 import IpfsRepository from './repository/ipfs.repository.js'
 import S3Repository from './repository/s3.repository.js'
-import { filterAlgoAssetsByDbAssets, isValidAsset } from './utils/assets.js'
+import { filterAlgoAssetsByDbAssets, isValidAsset, TRBD, TRCL, TRLD } from './utils/assets.js'
 import { isNumber, isPositiveNumber } from './utils/validators.js'
 import { TypePositiveNumberError } from './error/type-positive-number.error.js'
 import { TypeNumberError } from './error/type-number.error.js'
+import { NftTypeError } from './error/nft-type.error.js'
 
 dotenv.config()
 export const app = new Koa()
@@ -154,12 +155,12 @@ router.post('/nfts', bodyparser(), async (ctx) => {
     if (!ctx.request.body.symbol) throw new MissingParameterError('symbol')
     if (!ctx.request.body.offchainUrl) throw new MissingParameterError('offchainUrl')
 
-    const symbol = ctx.request.body.symbol.toLowerCase()
+    const symbol = ctx.request.body.symbol.toUpperCase()
     const power = ctx.request.body.power
     const positionX = ctx.request.body.positionX
     const positionY = ctx.request.body.positionY
 
-    if (symbol === 'trcl') {
+    if (symbol === TRCL) {
         if (!power) throw new MissingParameterError('power')
         if (!isPositiveNumber(power)) throw new TypePositiveNumberError('power')
 
@@ -171,7 +172,7 @@ router.post('/nfts', bodyparser(), async (ctx) => {
         })
     }
 
-    else if (symbol === 'trld') {
+    else if (symbol === TRLD) {
         if (!isNumber(positionX)) throw new TypeNumberError('positionX')
         if (!isNumber(positionY)) throw new TypeNumberError('positionY')
 
@@ -184,12 +185,16 @@ router.post('/nfts', bodyparser(), async (ctx) => {
         })
     }
 
-    else {
+    else if (symbol === TRBD) {
         await new TokenRepository().putTrbdToken({
             assetId: ctx.request.body.assetId,
             symbol: ctx.request.body.symbol,
             offchainUrl: ctx.request.body.offchainUrl
         })
+    }
+
+    else {
+        throw new NftTypeError()
     }
 
     ctx.body = ''

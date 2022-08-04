@@ -12,14 +12,18 @@ jest.mock('./network/algo-indexer.js', () => jest.fn().mockImplementation(() => 
 
 const mockTokenRepository = {
     getToken: jest.fn().mockImplementation(() => jest.fn()),
-    putToken: jest.fn().mockImplementation(() => jest.fn()),
+    putTrclToken: jest.fn().mockImplementation(() => jest.fn()),
+    putTrldToken: jest.fn().mockImplementation(() => jest.fn()),
+    putTrbdToken: jest.fn().mockImplementation(() => jest.fn()),
     deleteToken: jest.fn().mockImplementation(() => jest.fn()),
     putTokenContract: jest.fn().mockImplementation(() => jest.fn()),
     deleteTokenContract: jest.fn().mockImplementation(() => jest.fn())
 }
 jest.mock('./repository/token.repository.js', () => jest.fn().mockImplementation(() => ({
     getToken: mockTokenRepository.getToken,
-    putToken: mockTokenRepository.putToken,
+    putTrclToken: mockTokenRepository.putTrclToken,
+    putTrldToken: mockTokenRepository.putTrldToken,
+    putTrbdToken: mockTokenRepository.putTrbdToken,
     deleteToken: mockTokenRepository.deleteToken,
     putTokenContract: mockTokenRepository.putTokenContract,
     deleteTokenContract: mockTokenRepository.deleteTokenContract
@@ -1190,7 +1194,7 @@ describe('app', function () {
             expect(response.body).toEqual({ assets: [] })
         })
 
-        it('should return 200 when calling nft type endpoint and assets found', async () => {
+        it('should return 200 when calling nft type endpoint and trcl assets found', async () => {
             mockAlgoIndexer.callRandLabsIndexerEndpoint.mockImplementation(() => Promise.resolve({
                 status: 200,
                 json: {
@@ -1249,7 +1253,10 @@ describe('app', function () {
                 }
             }))
 
-            mockTokenRepository.getToken.mockImplementation(assetId => Promise.resolve({ id: assetId }))
+            mockTokenRepository.getToken.mockImplementation(assetId => Promise.resolve({
+                id: assetId,
+                power: assetId + 10
+            }))
 
             const response = await request(app.callback()).get('/nfts/type/trcl')
 
@@ -1262,12 +1269,104 @@ describe('app', function () {
                     id: 1,
                     name: 'Terracell #1',
                     symbol: 'TRCL',
-                    url: 'https://terragrids.org#1'
+                    url: 'https://terragrids.org#1',
+                    power: 11
                 }, {
                     id: 5,
                     name: 'Terracell #5',
                     symbol: 'TRCL',
-                    url: 'https://terragrids.org#5'
+                    url: 'https://terragrids.org#5',
+                    power: 15
+                }]
+            })
+        })
+
+        it('should return 200 when calling nft type endpoint and trld assets found', async () => {
+            mockAlgoIndexer.callRandLabsIndexerEndpoint.mockImplementation(() => Promise.resolve({
+                status: 200,
+                json: {
+                    assets: [{
+                        index: 1,
+                        deleted: false,
+                        params: {
+                            decimals: 0,
+                            name: 'Terraland #1',
+                            total: 1,
+                            'unit-name': 'TRLD',
+                            url: 'https://terragrids.org#1'
+                        }
+                    }, {
+                        index: 2,
+                        deleted: true,
+                        params: {
+                            decimals: 0,
+                            name: 'Terraland #2',
+                            total: 1,
+                            'unit-name': 'TRLD',
+                            url: 'https://terragrids.org#2'
+                        }
+                    },
+                    {
+                        index: 3,
+                        deleted: false,
+                        params: {
+                            decimals: 1,
+                            name: 'Terraland #3',
+                            total: 1,
+                            'unit-name': 'TRLD',
+                            url: 'https://terragrids.org#3'
+                        }
+                    }, {
+                        index: 4,
+                        deleted: false,
+                        params: {
+                            decimals: 0,
+                            name: 'Terraland #4',
+                            total: 100,
+                            'unit-name': 'TRLD',
+                            url: 'https://terragrids.org#4'
+                        }
+                    }, {
+                        index: 5,
+                        deleted: false,
+                        params: {
+                            decimals: 0,
+                            name: 'Terraland #5',
+                            total: 1,
+                            'unit-name': 'TRLD',
+                            url: 'https://terragrids.org#5'
+                        }
+                    }]
+                }
+            }))
+
+            mockTokenRepository.getToken.mockImplementation(assetId => Promise.resolve({
+                id: assetId,
+                positionX: assetId + 10,
+                positionY: assetId + 11
+            }))
+
+            const response = await request(app.callback()).get('/nfts/type/trcl')
+
+            expect(mockAlgoIndexer.callRandLabsIndexerEndpoint).toHaveBeenCalledTimes(1)
+            expect(mockAlgoIndexer.callRandLabsIndexerEndpoint).toHaveBeenCalledWith('assets?unit=TRCL')
+
+            expect(response.status).toBe(200)
+            expect(response.body).toEqual({
+                assets: [{
+                    id: 1,
+                    name: 'Terraland #1',
+                    symbol: 'TRLD',
+                    url: 'https://terragrids.org#1',
+                    positionX: 11,
+                    positionY: 12
+                }, {
+                    id: 5,
+                    name: 'Terraland #5',
+                    symbol: 'TRLD',
+                    url: 'https://terragrids.org#5',
+                    positionX: 15,
+                    positionY: 16
                 }]
             })
         })
@@ -1672,7 +1771,73 @@ describe('app', function () {
     })
 
     describe('post nfts endpoint', function () {
-        it('should return 201 when posting nft endpoint', async () => {
+        it('should return 201 when posting trcl nfts', async () => {
+            const response = await request(app.callback())
+                .post('/nfts')
+                .send({
+                    assetId: '123',
+                    symbol: 'TRCL',
+                    offchainUrl: 'offchain_url',
+                    power: 10
+                })
+
+            expect(mockTokenRepository.putTrclToken).toHaveBeenCalledTimes(1)
+            expect(mockTokenRepository.putTrclToken).toHaveBeenCalledWith({
+                assetId: '123',
+                symbol: 'TRCL',
+                offchainUrl: 'offchain_url',
+                power: 10
+            })
+
+            expect(response.status).toBe(201)
+            expect(response.body).toEqual({})
+        })
+
+        it('should return 201 when posting trld nfts', async () => {
+            const response = await request(app.callback())
+                .post('/nfts')
+                .send({
+                    assetId: '123',
+                    symbol: 'TRLD',
+                    offchainUrl: 'offchain_url',
+                    positionX: 12,
+                    positionY: 7
+                })
+
+            expect(mockTokenRepository.putTrldToken).toHaveBeenCalledTimes(1)
+            expect(mockTokenRepository.putTrldToken).toHaveBeenCalledWith({
+                assetId: '123',
+                symbol: 'TRLD',
+                offchainUrl: 'offchain_url',
+                positionX: 12,
+                positionY: 7
+            })
+
+            expect(response.status).toBe(201)
+            expect(response.body).toEqual({})
+        })
+
+        it('should return 201 when posting trbd nfts', async () => {
+            const response = await request(app.callback())
+                .post('/nfts')
+                .send({
+                    assetId: '123',
+                    symbol: 'TRBD',
+                    offchainUrl: 'offchain_url'
+                })
+
+            expect(mockTokenRepository.putTrbdToken).toHaveBeenCalledTimes(1)
+            expect(mockTokenRepository.putTrbdToken).toHaveBeenCalledWith({
+                assetId: '123',
+                symbol: 'TRBD',
+                offchainUrl: 'offchain_url'
+            })
+
+            expect(response.status).toBe(201)
+            expect(response.body).toEqual({})
+        })
+
+        it('should return 400 when posting unsupported nfts', async () => {
             const response = await request(app.callback())
                 .post('/nfts')
                 .send({
@@ -1681,26 +1846,28 @@ describe('app', function () {
                     offchainUrl: 'offchain_url'
                 })
 
-            expect(mockTokenRepository.putToken).toHaveBeenCalledTimes(1)
-            expect(mockTokenRepository.putToken).toHaveBeenCalledWith({
-                assetId: '123',
-                symbol: 'SYMB',
-                offchainUrl: 'offchain_url'
-            })
+            expect(mockTokenRepository.putTrclToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putTrldToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putTrbdToken).not.toHaveBeenCalled()
 
-            expect(response.status).toBe(201)
-            expect(response.body).toEqual({})
+            expect(response.status).toBe(400)
+            expect(response.body).toEqual({
+                error: 'NftTypeError',
+                message: 'Invalid NFT type'
+            })
         })
 
         it('should return 400 when posting nft endpoint and asset id missing', async () => {
             const response = await request(app.callback())
                 .post('/nfts')
                 .send({
-                    symbol: 'SYMB',
+                    symbol: 'TRCL',
                     offchainUrl: 'offchain_url'
                 })
 
-            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putTrclToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putTrldToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putTrbdToken).not.toHaveBeenCalled()
 
             expect(response.status).toBe(400)
             expect(response.body).toEqual({
@@ -1717,7 +1884,9 @@ describe('app', function () {
                     offchainUrl: 'offchain_url'
                 })
 
-            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putTrclToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putTrldToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putTrbdToken).not.toHaveBeenCalled()
 
             expect(response.status).toBe(400)
             expect(response.body).toEqual({
@@ -1731,15 +1900,121 @@ describe('app', function () {
                 .post('/nfts')
                 .send({
                     assetId: '123',
-                    symbol: 'SYMB'
+                    symbol: 'TRCL'
                 })
 
-            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putTrclToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putTrldToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putTrbdToken).not.toHaveBeenCalled()
 
             expect(response.status).toBe(400)
             expect(response.body).toEqual({
                 error: 'MissingParameterError',
                 message: 'offchainUrl must be specified'
+            })
+        })
+
+        it('should return 400 when posting trcl nft and power missing', async () => {
+            const response = await request(app.callback())
+                .post('/nfts')
+                .send({
+                    assetId: '123',
+                    symbol: 'TRCL',
+                    offchainUrl: 'offchain_url'
+                })
+
+            expect(mockTokenRepository.putTrclToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putTrldToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putTrbdToken).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(400)
+            expect(response.body).toEqual({
+                error: 'MissingParameterError',
+                message: 'power must be specified'
+            })
+        })
+
+        it('should return 400 when posting trcl nft and power not a number', async () => {
+            const response = await request(app.callback())
+                .post('/nfts')
+                .send({
+                    assetId: '123',
+                    symbol: 'TRCL',
+                    offchainUrl: 'offchain_url',
+                    power: 'meh'
+                })
+
+            expect(mockTokenRepository.putTrclToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putTrldToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putTrbdToken).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(400)
+            expect(response.body).toEqual({
+                error: 'TypePositiveNumberError',
+                message: 'power must be a positive number'
+            })
+        })
+
+        it('should return 400 when posting trcl nft and power not a positive number', async () => {
+            const response = await request(app.callback())
+                .post('/nfts')
+                .send({
+                    assetId: '123',
+                    symbol: 'TRCL',
+                    offchainUrl: 'offchain_url',
+                    power: -12
+                })
+
+            expect(mockTokenRepository.putTrclToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putTrldToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putTrbdToken).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(400)
+            expect(response.body).toEqual({
+                error: 'TypePositiveNumberError',
+                message: 'power must be a positive number'
+            })
+        })
+
+        it('should return 400 when posting trld nft and positionX missing', async () => {
+            const response = await request(app.callback())
+                .post('/nfts')
+                .send({
+                    assetId: '123',
+                    symbol: 'TRLD',
+                    offchainUrl: 'offchain_url',
+                    positionY: 10
+                })
+
+            expect(mockTokenRepository.putTrclToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putTrldToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putTrbdToken).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(400)
+            expect(response.body).toEqual({
+                error: 'TypeNumberError',
+                message: 'positionX must be a number'
+            })
+        })
+
+        it('should return 400 when posting trld nft and positionY missing', async () => {
+            const response = await request(app.callback())
+                .post('/nfts')
+                .send({
+                    assetId: '123',
+                    symbol: 'TRLD',
+                    offchainUrl: 'offchain_url',
+                    positionX: 10
+                })
+
+            expect(mockTokenRepository.putTrclToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putTrldToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putTrbdToken).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(400)
+            expect(response.body).toEqual({
+                error: 'TypeNumberError',
+                message: 'positionY must be a number'
             })
         })
     })

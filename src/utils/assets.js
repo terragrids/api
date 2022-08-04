@@ -1,3 +1,7 @@
+export const TRCL = 'TRCL'
+export const TRLD = 'TRLD'
+export const TRBD = 'TRBD'
+
 export function filterAlgoAssetsByDbAssets(algoAssets, dbAssets) {
     const assets = []
     for (const algoAsset of algoAssets) {
@@ -17,8 +21,8 @@ export function filterAlgoAssetsByDbAssets(algoAssets, dbAssets) {
 
 export function isValidAsset(asset) {
     return asset && (
-        asset.params['unit-name'] === 'TRCL' ||
-        asset.params['unit-name'] === 'TRLD' ||
-        asset.params['unit-name'] === 'TRBD'
+        asset.params['unit-name'] === TRCL ||
+        asset.params['unit-name'] === TRLD ||
+        asset.params['unit-name'] === TRBD
     )
 }
