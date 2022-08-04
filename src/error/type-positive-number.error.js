@@ -1,17 +1,17 @@
 import GenericError from './generic-error.js'
 
-export class TypeNumberError extends GenericError {
+export class TypePositiveNumberError extends GenericError {
     httpCode = 400
     message
 
     constructor(parameter) {
         super()
-        this.message = `${parameter} must be a number`
+        this.message = `${parameter} must be a positive number`
     }
 
     toJson() {
         return {
-            error: 'TypeNumberError',
+            error: 'TypePositiveNumberError',
             message: this.message
         }
     }

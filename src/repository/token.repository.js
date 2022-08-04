@@ -7,7 +7,7 @@ export default class TokenRepository extends DynamoDbRepository {
     pkSolarPowerPlantPrefix = 'spp'
     itemName = 'token'
 
-    async putToken({ assetId, symbol, offchainUrl, power }) {
+    async putTrclToken({ assetId, symbol, offchainUrl, power }) {
         const params = {
             TransactItems: [
                 this.getUpdateCountersTnxCommand({
@@ -32,6 +32,30 @@ export default class TokenRepository extends DynamoDbRepository {
         })
     }
 
+    async putTrldToken({ assetId, symbol, offchainUrl, positionX, positionY }) {
+        return await this.put({
+            item: {
+                pk: { S: `${this.pkTokenPrefix}|${assetId}` },
+                symbol: { S: symbol },
+                offchainUrl: { S: offchainUrl },
+                positionX: { N: positionX },
+                positionY: { N: positionY }
+            },
+            itemLogName: this.itemName
+        })
+    }
+
+    async putTrbdToken({ assetId, symbol, offchainUrl }) {
+        return await this.put({
+            item: {
+                pk: { S: `${this.pkTokenPrefix}|${assetId}` },
+                symbol: { S: symbol },
+                offchainUrl: { S: offchainUrl }
+            },
+            itemLogName: this.itemName
+        })
+    }
+
     async getToken(assetId) {
         try {
             const data = await this.get({
@@ -49,7 +73,9 @@ export default class TokenRepository extends DynamoDbRepository {
                 ...data.Item.assetPrice && data.Item.assetPrice.S && { assetPrice: data.Item.assetPrice.S },
                 ...data.Item.assetPriceUnit && data.Item.assetPriceUnit.S && { assetPriceUnit: data.Item.assetPriceUnit.S },
                 ...data.Item.verified && data.Item.applicationId && data.Item.applicationId.S && { verified: data.Item.verified.BOOL },
-                ...data.Item.power && data.Item.power.N && { power: data.Item.power.N }
+                ...data.Item.power && data.Item.power.N && { power: data.Item.power.N },
+                ...data.Item.positionX && data.Item.positionX.N && { positionX: data.Item.positionX.N },
+                ...data.Item.positionY && data.Item.positionY.N && { positionY: data.Item.positionY.N }
             } : null
 
         } catch (e) {

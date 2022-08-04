@@ -14,8 +14,9 @@ import ApplicationStillRunningError from './error/application-still-running.erro
 import IpfsRepository from './repository/ipfs.repository.js'
 import S3Repository from './repository/s3.repository.js'
 import { filterAlgoAssetsByDbAssets, isValidAsset } from './utils/assets.js'
-import { isPositiveNumber } from './utils/validators.js'
-import { TypePositiveNumberError } from './error/type-number.error.js'
+import { isNumber, isPositiveNumber } from './utils/validators.js'
+import { TypePositiveNumberError } from './error/type-positive-number.error.js'
+import { TypeNumberError } from './error/type-number.error.js'
 
 dotenv.config()
 export const app = new Koa()
@@ -155,18 +156,41 @@ router.post('/nfts', bodyparser(), async (ctx) => {
 
     const symbol = ctx.request.body.symbol.toLowerCase()
     const power = ctx.request.body.power
+    const positionX = ctx.request.body.positionX
+    const positionY = ctx.request.body.positionY
 
     if (symbol === 'trcl') {
         if (!power) throw new MissingParameterError('power')
         if (!isPositiveNumber(power)) throw new TypePositiveNumberError('power')
+
+        await new TokenRepository().putTrclToken({
+            assetId: ctx.request.body.assetId,
+            symbol: ctx.request.body.symbol,
+            offchainUrl: ctx.request.body.offchainUrl,
+            power
+        })
     }
 
-    await new TokenRepository().putToken({
-        assetId: ctx.request.body.assetId,
-        symbol: ctx.request.body.symbol,
-        offchainUrl: ctx.request.body.offchainUrl,
-        ...symbol === 'trcl' && { power }
-    })
+    else if (symbol === 'trld') {
+        if (!isNumber(positionX)) throw new TypeNumberError('positionX')
+        if (!isNumber(positionY)) throw new TypeNumberError('positionY')
+
+        await new TokenRepository().putTrldToken({
+            assetId: ctx.request.body.assetId,
+            symbol: ctx.request.body.symbol,
+            offchainUrl: ctx.request.body.offchainUrl,
+            positionX,
+            positionY
+        })
+    }
+
+    else {
+        await new TokenRepository().putTrbdToken({
+            assetId: ctx.request.body.assetId,
+            symbol: ctx.request.body.symbol,
+            offchainUrl: ctx.request.body.offchainUrl
+        })
+    }
 
     ctx.body = ''
     ctx.status = 201
