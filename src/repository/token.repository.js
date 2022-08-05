@@ -22,7 +22,7 @@ export default class TokenRepository extends DynamoDbRepository {
                     pk: { S: `${this.pkTokenPrefix}|${assetId}` },
                     symbol: { S: symbol },
                     offchainUrl: { S: offchainUrl },
-                    power: { N: power }
+                    power: { N: power.toString() }
                 })
             ]
         }
@@ -39,8 +39,8 @@ export default class TokenRepository extends DynamoDbRepository {
                 pk: { S: `${this.pkTokenPrefix}|${assetId}` },
                 symbol: { S: symbol },
                 offchainUrl: { S: offchainUrl },
-                positionX: { N: positionX },
-                positionY: { N: positionY }
+                positionX: { N: positionX.toString() },
+                positionY: { N: positionY.toString() }
             },
             itemLogName: this.itemName
         })
@@ -74,9 +74,9 @@ export default class TokenRepository extends DynamoDbRepository {
                 ...data.Item.assetPrice && data.Item.assetPrice.S && { assetPrice: data.Item.assetPrice.S },
                 ...data.Item.assetPriceUnit && data.Item.assetPriceUnit.S && { assetPriceUnit: data.Item.assetPriceUnit.S },
                 ...data.Item.verified && data.Item.applicationId && data.Item.applicationId.S && { verified: data.Item.verified.BOOL },
-                ...data.Item.power && data.Item.power.N && { power: data.Item.power.N },
-                ...data.Item.positionX && data.Item.positionX.N && { positionX: data.Item.positionX.N },
-                ...data.Item.positionY && data.Item.positionY.N && { positionY: data.Item.positionY.N }
+                ...data.Item.power && data.Item.power.N && { power: parseInt(data.Item.power.N) },
+                ...data.Item.positionX && data.Item.positionX.N && { positionX: parseInt(data.Item.positionX.N) },
+                ...data.Item.positionY && data.Item.positionY.N && { positionY: parseInt(data.Item.positionY.N) }
             } : null
 
         } catch (e) {
