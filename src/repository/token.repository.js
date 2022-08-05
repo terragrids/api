@@ -74,9 +74,9 @@ export default class TokenRepository extends DynamoDbRepository {
                 ...data.Item.assetPrice && data.Item.assetPrice.S && { assetPrice: data.Item.assetPrice.S },
                 ...data.Item.assetPriceUnit && data.Item.assetPriceUnit.S && { assetPriceUnit: data.Item.assetPriceUnit.S },
                 ...data.Item.verified && data.Item.applicationId && data.Item.applicationId.S && { verified: data.Item.verified.BOOL },
-                ...data.Item.power && data.Item.power.N && { power: parseInt(data.Item.power.N) },
-                ...data.Item.positionX && data.Item.positionX.N && { positionX: parseInt(data.Item.positionX.N) },
-                ...data.Item.positionY && data.Item.positionY.N && { positionY: parseInt(data.Item.positionY.N) }
+                ...data.Item.power && data.Item.power.N !== undefined && { power: parseInt(data.Item.power.N) },
+                ...data.Item.positionX && data.Item.positionX.N !== undefined && { positionX: parseInt(data.Item.positionX.N) },
+                ...data.Item.positionY && data.Item.positionY.N !== undefined && { positionY: parseInt(data.Item.positionY.N) }
             } : null
 
         } catch (e) {

@@ -10,9 +10,9 @@ export function filterAlgoAssetsByDbAssets(algoAssets, dbAssets) {
             assets.push({
                 ...algoAsset,
                 offchainUrl: dbAsset.offchainUrl,
-                ...dbAsset.power && { power: dbAsset.power },
-                ...dbAsset.positionX && { positionX: dbAsset.positionX },
-                ...dbAsset.positionY && { positionY: dbAsset.positionY }
+                ...dbAsset.power !== undefined && { power: dbAsset.power },
+                ...dbAsset.positionX !== undefined && { positionX: dbAsset.positionX },
+                ...dbAsset.positionY !== undefined && { positionY: dbAsset.positionY }
             })
         }
     }
