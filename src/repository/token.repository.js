@@ -87,6 +87,7 @@ export default class TokenRepository extends DynamoDbRepository {
 
     async deleteToken(assetId) {
         const token = await this.getToken(assetId)
+        if (!token) throw new AssetNotFoundError()
 
         const params = {
             TransactItems: [
