@@ -1,6 +1,4 @@
-import { ConditionalCheckFailedException, DeleteItemCommand, DynamoDBClient, GetItemCommand, PutItemCommand, QueryCommand } from '@aws-sdk/client-dynamodb'
-import AssetContractNotFoundError from '../error/asset-contract-not-found.error.js'
-import AssetNotFoundError from '../error/asset-not-found.error.js'
+import { ConditionalCheckFailedException, DeleteItemCommand, DynamoDBClient, GetItemCommand, PutItemCommand, QueryCommand, TransactWriteItemsCommand, UpdateItemCommand } from '@aws-sdk/client-dynamodb'
 import RepositoryError from '../error/repository.error.js'
 
 export default class DynamoDbRepository {
@@ -45,7 +43,7 @@ export default class DynamoDbRepository {
         try {
             return await this.client.send(command)
         } catch (e) {
-            if (e instanceof ConditionalCheckFailedException) throw new AssetContractNotFoundError()
+            if (e instanceof ConditionalCheckFailedException) throw e
             throw new RepositoryError(e, `Unable to get ${itemLogName}`)
         }
     }
@@ -65,6 +63,52 @@ export default class DynamoDbRepository {
         }
     }
 
+    async update({ key, condition, attributes, itemLogName = 'item' }) {
+        const { updateExpression, attributeNames, attributeValues } = this.buildUpdate(attributes)
+        const params = {
+            TableName: this.table,
+            Key: key,
+            UpdateExpression: updateExpression,
+            ExpressionAttributeNames: attributeNames,
+            ExpressionAttributeValues: attributeValues,
+            ...condition && { ConditionExpression: condition }
+        }
+
+        const command = new UpdateItemCommand(params)
+
+        try {
+            return await this.client.send(command)
+        } catch (e) {
+            if (e instanceof ConditionalCheckFailedException) throw e
+            throw new RepositoryError(e, `Unable to update ${itemLogName}`)
+        }
+    }
+
+    buildUpdate(attributes) {
+        const updateExpression = []
+        const attributeValues = {}
+        let attributeNames
+
+        for (const [key, value] of Object.entries(attributes)) {
+            if (value !== undefined) {
+                let placeholder = key
+                if (key.startsWith('#')) {
+                    placeholder = key.substring(1)
+                    if (!attributeNames) attributeNames = {}
+                    attributeNames[key] = placeholder
+                }
+                updateExpression.push(`${key} = :${placeholder}`)
+                attributeValues[`:${placeholder}`] = value
+            }
+        }
+
+        return {
+            updateExpression: updateExpression.length > 0 ? `set ${updateExpression.join(',')}` : null,
+            attributeNames,
+            attributeValues
+        }
+    }
+
     async delete({ key, itemLogName = 'item' }) {
         const params = {
             TableName: this.table,
@@ -76,8 +120,52 @@ export default class DynamoDbRepository {
         try {
             return await this.client.send(command)
         } catch (e) {
-            if (e instanceof ConditionalCheckFailedException) throw new AssetNotFoundError()
+            if (e instanceof ConditionalCheckFailedException) throw e
             else throw new RepositoryError(e, `Unable to delete ${itemLogName}`)
+        }
+    }
+
+    async transactWrite({ params, itemLogName = 'item' }) {
+        const command = new TransactWriteItemsCommand(params)
+
+        try {
+            return await this.client.send(command)
+        } catch (e) {
+            console.error(e)
+            if (e instanceof ConditionalCheckFailedException) throw e
+            else throw new RepositoryError(e, `Unable to execute transaction on ${itemLogName}`)
+        }
+    }
+
+    getUpdateCountersTnxCommand({ key, counters, conditionExpression }) {
+        return {
+            Update: {
+                TableName: this.table,
+                Key: key,
+                UpdateExpression: `add ${counters.map(c => `${c.name} :${c.name}`).join(',')}`,
+                ExpressionAttributeValues: {
+                    ...counters.reduce((map, counter) => (map[`:${counter.name}`] = { N: counter.change }, map), {})
+                },
+                ...conditionExpression && { ConditionExpression: conditionExpression }
+            }
+        }
+    }
+
+    getPutTnxCommand(item) {
+        return {
+            Put: {
+                TableName: this.table,
+                Item: item
+            }
+        }
+    }
+
+    getDeleteTnxCommand(key) {
+        return {
+            Delete: {
+                TableName: this.table,
+                Key: key
+            }
         }
     }
 }
