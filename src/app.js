@@ -18,6 +18,7 @@ import { isNumber, isPositiveNumber } from './utils/validators.js'
 import { TypePositiveNumberError } from './error/type-positive-number.error.js'
 import { TypeNumberError } from './error/type-number.error.js'
 import { NftTypeError } from './error/nft-type.error.js'
+import DynamoDbRepository from './repository/dynamodb.repository.js'
 
 dotenv.config()
 export const app = new Koa()
@@ -31,6 +32,7 @@ router.get('/hc', async (ctx) => {
     ctx.body = {
         env: process.env.ENV,
         region: process.env.AWS_REGION,
+        db: await new DynamoDbRepository().testConnection(),
         ipfs: await new IpfsRepository().testConnection(),
         s3: await new S3Repository().testConnection()
     }

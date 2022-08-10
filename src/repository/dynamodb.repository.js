@@ -1,4 +1,4 @@
-import { ConditionalCheckFailedException, DeleteItemCommand, DynamoDBClient, GetItemCommand, PutItemCommand, QueryCommand, TransactWriteItemsCommand, UpdateItemCommand } from '@aws-sdk/client-dynamodb'
+import { ConditionalCheckFailedException, DeleteItemCommand, DescribeTableCommand, DynamoDBClient, GetItemCommand, PutItemCommand, QueryCommand, TransactWriteItemsCommand, UpdateItemCommand } from '@aws-sdk/client-dynamodb'
 import RepositoryError from '../error/repository.error.js'
 
 export default class DynamoDbRepository {
@@ -11,6 +11,22 @@ export default class DynamoDbRepository {
             endpoint: process.env.DYNAMO_DB_ENDPOINT
         })
         this.table = process.env.DYNAMO_DB_ENV === 'prod' ? 'terragrids' : 'terragrids-dev'
+    }
+
+    async testConnection() {
+        const command = new DescribeTableCommand({ TableName: this.table })
+        try {
+            const response = await this.client.send(command)
+            console.log(JSON.stringify(response, null, 4))
+            return {
+                status: response.$metadata.httpStatusCode,
+                table: this.table,
+                region: process.env.DYNAMO_DB_REGION,
+                endpoint: process.env.DYNAMO_DB_ENDPOINT
+            }
+        } catch (e) {
+            return { error: 'Unable to connect to dynamo db' }
+        }
     }
 
     async query({ conditionExpression, attributeNames, attributeValues, pageSize = 1, nextPageKey, forward = true, itemLogName = 'item' }) {

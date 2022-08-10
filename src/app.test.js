@@ -10,6 +10,13 @@ jest.mock('./network/algo-indexer.js', () => jest.fn().mockImplementation(() => 
     callAlgonodeIndexerEndpoint: mockAlgoIndexer.callAlgonodeIndexerEndpoint
 })))
 
+const mockDynamoDbRepository = {
+    testConnection: jest.fn().mockImplementation(() => jest.fn())
+}
+jest.mock('./repository/dynamodb.repository.js', () => jest.fn().mockImplementation(() => ({
+    testConnection: mockDynamoDbRepository.testConnection
+})))
+
 const mockTokenRepository = {
     getToken: jest.fn().mockImplementation(() => jest.fn()),
     putTrclToken: jest.fn().mockImplementation(() => jest.fn()),
@@ -73,16 +80,19 @@ describe('app', function () {
 
     describe('get health check endpoint', function () {
         it('should return 200 when calling hc endpoint', async () => {
-            mockIpfsRepository.testConnection.mockImplementation(() => Promise.resolve(true))
-            mockS3Repository.testConnection.mockImplementation(() => Promise.resolve(true))
+            mockIpfsRepository.testConnection.mockImplementation(() => Promise.resolve({ ipfs: true }))
+            mockS3Repository.testConnection.mockImplementation(() => Promise.resolve({ s3: true }))
+            mockDynamoDbRepository.testConnection.mockImplementation(() => Promise.resolve({ dynamodb: true }))
 
             const response = await request(app.callback()).get('/hc')
+            expect(response.status).toBe(200)
             expect(response.status).toBe(200)
             expect(response.body).toEqual({
                 env: 'dev',
                 region: 'local',
-                ipfs: true,
-                s3: true
+                ipfs: { ipfs: true },
+                s3: { s3: true },
+                db: { dynamodb: true }
             })
         })
     })
