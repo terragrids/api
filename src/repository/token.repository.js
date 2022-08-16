@@ -66,8 +66,6 @@ export default class TokenRepository extends DynamoDbRepository {
                 itemLogName: this.itemName
             })
 
-            console.log(data.Item ? JSON.stringify(data.Item, null, 4) : 'not found')
-
             return data.Item && data.Item.symbol ? {
                 id: assetId,
                 symbol: data.Item.symbol.S,
