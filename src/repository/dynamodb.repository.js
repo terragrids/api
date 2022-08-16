@@ -17,7 +17,6 @@ export default class DynamoDbRepository {
         const command = new DescribeTableCommand({ TableName: this.table })
         try {
             const response = await this.client.send(command)
-            console.log(JSON.stringify(response, null, 4))
             return {
                 status: response.$metadata.httpStatusCode,
                 table: this.table,

@@ -15,7 +15,7 @@ export default class TokenRepository extends DynamoDbRepository {
                     key: { pk: { S: this.pkSolarPowerPlantPrefix } },
                     counters: [{
                         name: 'powerCapacity',
-                        change: power
+                        change: power.toString()
                     }]
                 }),
                 this.getPutTnxCommand({
