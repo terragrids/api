@@ -68,10 +68,10 @@ export default class TokenRepository extends DynamoDbRepository {
 
             console.log(data.Item ? JSON.stringify(data.Item, null, 4) : 'not found')
 
-            return data.Item ? {
+            return data.Item && data.Item.symbol ? {
                 id: assetId,
                 symbol: data.Item.symbol.S,
-                offchainUrl: data.Item.offchainUrl.S,
+                ...data.Item.offchainUrl && data.Item.offchainUrl.S && {offchainUrl: data.Item.offchainUrl.S},
                 ...data.Item.applicationId && data.Item.applicationId.S && { contractId: data.Item.applicationId.S },
                 ...data.Item.contractInfo && data.Item.contractInfo.S && { contractInfo: data.Item.contractInfo.S },
                 ...data.Item.sellerAddress && data.Item.sellerAddress.S && { sellerAddress: data.Item.sellerAddress.S },
