@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 'use strict'
 
 import { app } from './app.js'

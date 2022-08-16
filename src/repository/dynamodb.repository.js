@@ -146,6 +146,7 @@ export default class DynamoDbRepository {
         try {
             return await this.client.send(command)
         } catch (e) {
+            // eslint-disable-next-line no-console
             console.error(e)
             if (e instanceof ConditionalCheckFailedException) throw e
             else throw new RepositoryError(e, `Unable to execute transaction on ${itemLogName}`)

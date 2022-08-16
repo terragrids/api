@@ -59,8 +59,6 @@ export default class TokenRepository extends DynamoDbRepository {
 
     async getToken(assetId) {
         try {
-            console.log('getToken', assetId)
-
             const data = await this.get({
                 key: { pk: { S: `${this.pkTokenPrefix}|${assetId}` } },
                 itemLogName: this.itemName
