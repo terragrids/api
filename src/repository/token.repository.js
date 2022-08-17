@@ -159,4 +159,24 @@ export default class TokenRepository extends DynamoDbRepository {
             else throw e
         }
     }
+
+    async getSpp() {
+        try {
+            const data = await this.get({
+                key: { pk: { S: this.pkSolarPowerPlantPrefix } },
+                itemLogName: this.pkSolarPowerPlantPrefix
+            })
+
+            return data.Item ? {
+                ...data.Item.powerCapacity && data.Item.powerCapacity.N !== undefined && { capacity: parseInt(data.Item.powerCapacity.N) },
+                ...data.Item.powerOutput && data.Item.powerOutput.N !== undefined && { output: parseInt(data.Item.powerOutput.N) },
+                ...data.Item.totalTerracells && data.Item.totalTerracells.N !== undefined && { totalTerracells: parseInt(data.Item.totalTerracells.N) },
+                ...data.Item.activeTerracells && data.Item.activeTerracells.N !== undefined && { activeTerracells: parseInt(data.Item.activeTerracells.N) }
+            } : null
+
+        } catch (e) {
+            if (e instanceof ConditionalCheckFailedException) throw new AssetNotFoundError()
+            else throw e
+        }
+    }
 }

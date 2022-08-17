@@ -317,6 +317,11 @@ router.delete('/nfts/:assetId/contracts/:applicationId', async (ctx) => {
     ctx.status = 204
 })
 
+router.get('/spp', async (ctx) => {
+    const spp = await new TokenRepository().getSpp()
+    ctx.body = { ...spp }
+})
+
 router.get('/accounts/:accountId/nfts/:symbol', async (ctx) => {
     const symbol = ctx.params.symbol.toUpperCase()
     const response = await new AlgoIndexer().callRandLabsIndexerEndpoint(`accounts/${ctx.params.accountId}/assets`)

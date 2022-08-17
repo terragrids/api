@@ -24,7 +24,8 @@ const mockTokenRepository = {
     putTrbdToken: jest.fn().mockImplementation(() => jest.fn()),
     deleteToken: jest.fn().mockImplementation(() => jest.fn()),
     putTokenContract: jest.fn().mockImplementation(() => jest.fn()),
-    deleteTokenContract: jest.fn().mockImplementation(() => jest.fn())
+    deleteTokenContract: jest.fn().mockImplementation(() => jest.fn()),
+    getSpp: jest.fn().mockImplementation(() => jest.fn())
 }
 jest.mock('./repository/token.repository.js', () => jest.fn().mockImplementation(() => ({
     getToken: mockTokenRepository.getToken,
@@ -33,7 +34,8 @@ jest.mock('./repository/token.repository.js', () => jest.fn().mockImplementation
     putTrbdToken: mockTokenRepository.putTrbdToken,
     deleteToken: mockTokenRepository.deleteToken,
     putTokenContract: mockTokenRepository.putTokenContract,
-    deleteTokenContract: mockTokenRepository.deleteTokenContract
+    deleteTokenContract: mockTokenRepository.deleteTokenContract,
+    getSpp: mockTokenRepository.getSpp
 })))
 
 const mockIpfsRepository = {
@@ -2564,6 +2566,25 @@ describe('app', function () {
             expect(response.body).toEqual({
                 error: 'ApplicationStillRunningError',
                 message: 'Application specified is still running'
+            })
+        })
+    })
+
+    describe('get spp endpoint', function () {
+        it('should return 200 when calling spp endpoind', async () => {
+            mockTokenRepository.getSpp.mockImplementation(() => Promise.resolve({
+                capacity: 123,
+                output: 456
+            }))
+
+            const response = await request(app.callback()).get('/spp')
+
+            expect(mockTokenRepository.getSpp).toHaveBeenCalledTimes(1)
+
+            expect(response.status).toBe(200)
+            expect(response.body).toEqual({
+                capacity: 123,
+                output: 456
             })
         })
     })
