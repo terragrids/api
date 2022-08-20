@@ -2670,6 +2670,7 @@ describe('app', function () {
         it('should return 200 when calling spp endpoind', async () => {
             mockTokenRepository.getSpp.mockImplementation(() =>
                 Promise.resolve({
+                    contractInfo: 'contract_info',
                     capacity: 123,
                     output: 456
                 })
@@ -2681,6 +2682,7 @@ describe('app', function () {
 
             expect(response.status).toBe(200)
             expect(response.body).toEqual({
+                contractInfo: 'contract_info',
                 capacity: 123,
                 output: 456
             })

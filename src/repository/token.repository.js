@@ -189,11 +189,12 @@ export default class TokenRepository extends DynamoDbRepository {
         }
     }
 
-    async putSpp({ capacity, output, totalTerracells, activeTerracells }) {
+    async putSpp({ contractInfo, capacity, output, totalTerracells, activeTerracells }) {
         try {
             return await this.update({
                 key: { pk: { S: this.pkSolarPowerPlantPrefix } },
                 attributes: {
+                    ...(contractInfo !== undefined && { contractInfo: { S: contractInfo } }),
                     ...(capacity !== undefined && { powerCapacity: { N: capacity.toString() } }),
                     ...(output !== undefined && { powerOutput: { N: output.toString() } }),
                     ...(totalTerracells !== undefined && { totalTerracells: { N: totalTerracells.toString() } }),
