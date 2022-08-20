@@ -2690,6 +2690,7 @@ describe('app', function () {
     describe('put spp endpoint', function () {
         it('should return 204 when updating spp', async () => {
             const response = await request(app.callback()).put('/spp').send({
+                contractInfo: 'contract_info',
                 capacity: 123,
                 output: 456,
                 totalTerracells: 23,
@@ -2698,6 +2699,7 @@ describe('app', function () {
 
             expect(mockTokenRepository.putSpp).toHaveBeenCalledTimes(1)
             expect(mockTokenRepository.putSpp).toHaveBeenCalledWith({
+                contractInfo: 'contract_info',
                 capacity: 123,
                 output: 456,
                 totalTerracells: 23,

@@ -54,11 +54,7 @@ router.get('/terracells', async ctx => {
 
 router.get('/terracells/:assetId', async ctx => {
     const algoIndexer = new AlgoIndexer()
-    const [assetResponse, balancesResponse, contract] = await Promise.all([
-        algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}`),
-        algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}/balances`),
-        new TokenRepository().getToken(ctx.params.assetId)
-    ])
+    const [assetResponse, balancesResponse, contract] = await Promise.all([algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}`), algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}/balances`), new TokenRepository().getToken(ctx.params.assetId)])
 
     if (!assetResponse || assetResponse.status !== 200 || assetResponse.json.asset.params['unit-name'] !== 'TRCL') {
         throw new AssetNotFoundError()
@@ -90,24 +86,14 @@ router.post('/terracells/:assetId/contracts/:applicationId', bodyparser(), async
     if (!ctx.request.body.assetPriceUnit) throw new MissingParameterError('assetPriceUnit')
 
     const algoIndexer = new AlgoIndexer()
-    const [assetResponse, appResponse] = await Promise.all([
-        algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}`),
-        algoIndexer.callAlgonodeIndexerEndpoint(`applications/${ctx.params.applicationId}`)
-    ])
+    const [assetResponse, appResponse] = await Promise.all([algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}`), algoIndexer.callAlgonodeIndexerEndpoint(`applications/${ctx.params.applicationId}`)])
 
-    if (
-        assetResponse.status !== 200 ||
-        !assetResponse.json.asset ||
-        assetResponse.json.asset.params['unit-name'] !== 'TRCL'
-    ) {
+    if (assetResponse.status !== 200 || !assetResponse.json.asset || assetResponse.json.asset.params['unit-name'] !== 'TRCL') {
         throw new AssetNotFoundError()
     }
 
     let contractVerified = true
-    if (
-        appResponse.status !== 200 ||
-        appResponse.json.application.params['approval-program'] !== process.env.ALGO_APP_APPROVAL
-    ) {
+    if (appResponse.status !== 200 || appResponse.json.application.params['approval-program'] !== process.env.ALGO_APP_APPROVAL) {
         contractVerified = false
     }
 
@@ -127,16 +113,9 @@ router.post('/terracells/:assetId/contracts/:applicationId', bodyparser(), async
 
 router.delete('/terracells/:assetId/contracts/:applicationId', async ctx => {
     const algoIndexer = new AlgoIndexer()
-    const [assetResponse, appResponse] = await Promise.all([
-        algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}`),
-        algoIndexer.callAlgonodeIndexerEndpoint(`applications/${ctx.params.applicationId}`)
-    ])
+    const [assetResponse, appResponse] = await Promise.all([algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}`), algoIndexer.callAlgonodeIndexerEndpoint(`applications/${ctx.params.applicationId}`)])
 
-    if (
-        assetResponse.status !== 200 ||
-        !assetResponse.json.asset ||
-        assetResponse.json.asset.params['unit-name'] !== 'TRCL'
-    ) {
+    if (assetResponse.status !== 200 || !assetResponse.json.asset || assetResponse.json.asset.params['unit-name'] !== 'TRCL') {
         throw new AssetNotFoundError()
     }
 
@@ -157,13 +136,7 @@ router.get('/accounts/:accountId/terracells', async ctx => {
             response.status !== 200
                 ? []
                 : response.json.assets
-                      .filter(
-                          asset =>
-                              !asset.deleted &&
-                              asset.amount === 1 &&
-                              asset.decimals === 0 &&
-                              asset['unit-name'] === 'TRCL'
-                      )
+                      .filter(asset => !asset.deleted && asset.amount === 1 && asset.decimals === 0 && asset['unit-name'] === 'TRCL')
                       .map(asset => ({
                           id: asset['asset-id'],
                           name: asset.name,
@@ -219,11 +192,7 @@ router.post('/nfts', bodyparser(), async ctx => {
 
 router.get('/nfts/:assetId', async ctx => {
     const algoIndexer = new AlgoIndexer()
-    const [assetResponse, balancesResponse, offchainInfo] = await Promise.all([
-        algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}`),
-        algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}/balances`),
-        new TokenRepository().getToken(ctx.params.assetId)
-    ])
+    const [assetResponse, balancesResponse, offchainInfo] = await Promise.all([algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}`), algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}/balances`), new TokenRepository().getToken(ctx.params.assetId)])
 
     if (!assetResponse || assetResponse.status !== 200 || !offchainInfo) {
         throw new AssetNotFoundError()
@@ -282,20 +251,14 @@ router.post('/nfts/:assetId/contracts/:applicationId', bodyparser(), async ctx =
     if (!ctx.request.body.assetPriceUnit) throw new MissingParameterError('assetPriceUnit')
 
     const algoIndexer = new AlgoIndexer()
-    const [assetResponse, appResponse] = await Promise.all([
-        algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}`),
-        algoIndexer.callAlgonodeIndexerEndpoint(`applications/${ctx.params.applicationId}`)
-    ])
+    const [assetResponse, appResponse] = await Promise.all([algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}`), algoIndexer.callAlgonodeIndexerEndpoint(`applications/${ctx.params.applicationId}`)])
 
     if (assetResponse.status !== 200 || !isValidAsset(assetResponse.json.asset)) {
         throw new AssetNotFoundError()
     }
 
     let contractVerified = true
-    if (
-        appResponse.status !== 200 ||
-        appResponse.json.application.params['approval-program'] !== process.env.ALGO_APP_APPROVAL
-    ) {
+    if (appResponse.status !== 200 || appResponse.json.application.params['approval-program'] !== process.env.ALGO_APP_APPROVAL) {
         contractVerified = false
     }
 
@@ -315,10 +278,7 @@ router.post('/nfts/:assetId/contracts/:applicationId', bodyparser(), async ctx =
 
 router.delete('/nfts/:assetId/contracts/:applicationId', async ctx => {
     const algoIndexer = new AlgoIndexer()
-    const [assetResponse, appResponse] = await Promise.all([
-        algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}`),
-        algoIndexer.callAlgonodeIndexerEndpoint(`applications/${ctx.params.applicationId}`)
-    ])
+    const [assetResponse, appResponse] = await Promise.all([algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}`), algoIndexer.callAlgonodeIndexerEndpoint(`applications/${ctx.params.applicationId}`)])
 
     if (assetResponse.status !== 200 || !isValidAsset(assetResponse.json.asset)) {
         throw new AssetNotFoundError()
@@ -346,6 +306,7 @@ router.put('/spp', bodyparser(), async ctx => {
     if (!isNumberOrUndef(ctx.request.body.activeTerracells)) throw new TypeNumberError('activeTerracells')
 
     await new TokenRepository().putSpp({
+        contractInfo: ctx.request.body.contractInfo,
         capacity: ctx.request.body.capacity,
         output: ctx.request.body.output,
         totalTerracells: ctx.request.body.totalTerracells,
@@ -364,10 +325,7 @@ router.get('/accounts/:accountId/nfts/:symbol', async ctx => {
         response.status !== 200
             ? []
             : response.json.assets
-                  .filter(
-                      asset =>
-                          !asset.deleted && asset.amount === 1 && asset.decimals === 0 && asset['unit-name'] === symbol
-                  )
+                  .filter(asset => !asset.deleted && asset.amount === 1 && asset.decimals === 0 && asset['unit-name'] === symbol)
                   .map(asset => ({
                       id: asset['asset-id'],
                       name: asset.name,

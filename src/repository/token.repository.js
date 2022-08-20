@@ -176,6 +176,7 @@ export default class TokenRepository extends DynamoDbRepository {
 
             return data.Item
                 ? {
+                      ...(data.Item.contractInfo && data.Item.contractInfo.S !== undefined && { contractInfo: data.Item.contractInfo.S }),
                       ...(data.Item.powerCapacity && data.Item.powerCapacity.N !== undefined && { capacity: parseInt(data.Item.powerCapacity.N) }),
                       ...(data.Item.powerOutput && data.Item.powerOutput.N !== undefined && { output: parseInt(data.Item.powerOutput.N) }),
                       ...(data.Item.totalTerracells && data.Item.totalTerracells.N !== undefined && { totalTerracells: parseInt(data.Item.totalTerracells.N) }),
