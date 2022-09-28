@@ -2667,7 +2667,7 @@ describe('app', function () {
     })
 
     describe('get spp endpoint', function () {
-        it('should return 200 when calling spp endpoind', async () => {
+        it('should return 200 when calling spp endpoint', async () => {
             mockTokenRepository.getSpp.mockImplementation(() =>
                 Promise.resolve({
                     contractInfo: 'contract_info',
