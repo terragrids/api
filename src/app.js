@@ -14,7 +14,7 @@ import ApplicationStillRunningError from './error/application-still-running.erro
 import IpfsRepository from './repository/ipfs.repository.js'
 import S3Repository from './repository/s3.repository.js'
 import { filterAlgoAssetsByDbAssets, isValidAsset, TRBD, TRCL, TRLD } from './utils/assets.js'
-import { isNumber, isPositiveNumber } from './utils/validators.js'
+import { isNumber, isNumberOrUndef, isPositiveNumber } from './utils/validators.js'
 import { TypePositiveNumberError } from './error/type-positive-number.error.js'
 import { TypeNumberError } from './error/type-number.error.js'
 import { NftTypeError } from './error/nft-type.error.js'
@@ -24,11 +24,11 @@ dotenv.config()
 export const app = new Koa()
 const router = new Router()
 
-router.get('/', (ctx) => {
+router.get('/', ctx => {
     ctx.body = 'terragrids api'
 })
 
-router.get('/hc', async (ctx) => {
+router.get('/hc', async ctx => {
     ctx.body = {
         env: process.env.ENV,
         region: process.env.AWS_REGION,
@@ -38,7 +38,7 @@ router.get('/hc', async (ctx) => {
     }
 })
 
-router.get('/terracells', async (ctx) => {
+router.get('/terracells', async ctx => {
     const response = await new AlgoIndexer().callRandLabsIndexerEndpoint('assets?unit=TRCL')
     ctx.body = {
         assets: response.json.assets
@@ -52,13 +52,9 @@ router.get('/terracells', async (ctx) => {
     }
 })
 
-router.get('/terracells/:assetId', async (ctx) => {
+router.get('/terracells/:assetId', async ctx => {
     const algoIndexer = new AlgoIndexer()
-    const [assetResponse, balancesResponse, contract] = await Promise.all([
-        algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}`),
-        algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}/balances`),
-        new TokenRepository().getToken(ctx.params.assetId)
-    ])
+    const [assetResponse, balancesResponse, contract] = await Promise.all([algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}`), algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}/balances`), new TokenRepository().getToken(ctx.params.assetId)])
 
     if (!assetResponse || assetResponse.status !== 200 || assetResponse.json.asset.params['unit-name'] !== 'TRCL') {
         throw new AssetNotFoundError()
@@ -66,7 +62,7 @@ router.get('/terracells/:assetId', async (ctx) => {
         const asset = assetResponse.json.asset
         const balances = balancesResponse.json.balances
         ctx.body = {
-            asset: ({
+            asset: {
                 id: asset.index,
                 name: asset.params.name,
                 symbol: asset.params['unit-name'],
@@ -77,23 +73,20 @@ router.get('/terracells/:assetId', async (ctx) => {
                         address: balance.address,
                         amount: balance.amount
                     })),
-                ...contract && { contract }
-            })
+                ...(contract && { contract })
+            }
         }
     }
 })
 
-router.post('/terracells/:assetId/contracts/:applicationId', bodyparser(), async (ctx) => {
+router.post('/terracells/:assetId/contracts/:applicationId', bodyparser(), async ctx => {
     if (!ctx.request.body.contractInfo) throw new MissingParameterError('contractInfo')
     if (!ctx.request.body.sellerAddress) throw new MissingParameterError('sellerAddress')
     if (!ctx.request.body.assetPrice) throw new MissingParameterError('assetPrice')
     if (!ctx.request.body.assetPriceUnit) throw new MissingParameterError('assetPriceUnit')
 
     const algoIndexer = new AlgoIndexer()
-    const [assetResponse, appResponse] = await Promise.all([
-        algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}`),
-        algoIndexer.callAlgonodeIndexerEndpoint(`applications/${ctx.params.applicationId}`)
-    ])
+    const [assetResponse, appResponse] = await Promise.all([algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}`), algoIndexer.callAlgonodeIndexerEndpoint(`applications/${ctx.params.applicationId}`)])
 
     if (assetResponse.status !== 200 || !assetResponse.json.asset || assetResponse.json.asset.params['unit-name'] !== 'TRCL') {
         throw new AssetNotFoundError()
@@ -118,12 +111,9 @@ router.post('/terracells/:assetId/contracts/:applicationId', bodyparser(), async
     ctx.status = 201
 })
 
-router.delete('/terracells/:assetId/contracts/:applicationId', async (ctx) => {
+router.delete('/terracells/:assetId/contracts/:applicationId', async ctx => {
     const algoIndexer = new AlgoIndexer()
-    const [assetResponse, appResponse] = await Promise.all([
-        algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}`),
-        algoIndexer.callAlgonodeIndexerEndpoint(`applications/${ctx.params.applicationId}`)
-    ])
+    const [assetResponse, appResponse] = await Promise.all([algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}`), algoIndexer.callAlgonodeIndexerEndpoint(`applications/${ctx.params.applicationId}`)])
 
     if (assetResponse.status !== 200 || !assetResponse.json.asset || assetResponse.json.asset.params['unit-name'] !== 'TRCL') {
         throw new AssetNotFoundError()
@@ -139,20 +129,23 @@ router.delete('/terracells/:assetId/contracts/:applicationId', async (ctx) => {
     ctx.status = 204
 })
 
-router.get('/accounts/:accountId/terracells', async (ctx) => {
+router.get('/accounts/:accountId/terracells', async ctx => {
     const response = await new AlgoIndexer().callRandLabsIndexerEndpoint(`accounts/${ctx.params.accountId}/assets`)
     ctx.body = {
-        assets: response.status !== 200 ? [] : response.json.assets
-            .filter(asset => !asset.deleted && asset.amount === 1 && asset.decimals === 0 && asset['unit-name'] === 'TRCL')
-            .map(asset => ({
-                id: asset['asset-id'],
-                name: asset.name,
-                symbol: asset['unit-name']
-            }))
+        assets:
+            response.status !== 200
+                ? []
+                : response.json.assets
+                      .filter(asset => !asset.deleted && asset.amount === 1 && asset.decimals === 0 && asset['unit-name'] === 'TRCL')
+                      .map(asset => ({
+                          id: asset['asset-id'],
+                          name: asset.name,
+                          symbol: asset['unit-name']
+                      }))
     }
 })
 
-router.post('/nfts', bodyparser(), async (ctx) => {
+router.post('/nfts', bodyparser(), async ctx => {
     if (!ctx.request.body.assetId) throw new MissingParameterError('assetId')
     if (!ctx.request.body.symbol) throw new MissingParameterError('symbol')
     if (!ctx.request.body.offchainUrl) throw new MissingParameterError('offchainUrl')
@@ -172,9 +165,7 @@ router.post('/nfts', bodyparser(), async (ctx) => {
             offchainUrl: ctx.request.body.offchainUrl,
             power
         })
-    }
-
-    else if (symbol === TRLD) {
+    } else if (symbol === TRLD) {
         if (!isNumber(positionX)) throw new TypeNumberError('positionX')
         if (!isNumber(positionY)) throw new TypeNumberError('positionY')
 
@@ -185,17 +176,13 @@ router.post('/nfts', bodyparser(), async (ctx) => {
             positionX,
             positionY
         })
-    }
-
-    else if (symbol === TRBD) {
+    } else if (symbol === TRBD) {
         await new TokenRepository().putTrbdToken({
             assetId: ctx.request.body.assetId,
             symbol: ctx.request.body.symbol,
             offchainUrl: ctx.request.body.offchainUrl
         })
-    }
-
-    else {
+    } else {
         throw new NftTypeError()
     }
 
@@ -203,13 +190,9 @@ router.post('/nfts', bodyparser(), async (ctx) => {
     ctx.status = 201
 })
 
-router.get('/nfts/:assetId', async (ctx) => {
+router.get('/nfts/:assetId', async ctx => {
     const algoIndexer = new AlgoIndexer()
-    const [assetResponse, balancesResponse, offchainInfo] = await Promise.all([
-        algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}`),
-        algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}/balances`),
-        new TokenRepository().getToken(ctx.params.assetId)
-    ])
+    const [assetResponse, balancesResponse, offchainInfo] = await Promise.all([algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}`), algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}/balances`), new TokenRepository().getToken(ctx.params.assetId)])
 
     if (!assetResponse || assetResponse.status !== 200 || !offchainInfo) {
         throw new AssetNotFoundError()
@@ -217,7 +200,7 @@ router.get('/nfts/:assetId', async (ctx) => {
         const asset = assetResponse.json.asset
         const balances = balancesResponse.json.balances
         ctx.body = {
-            asset: ({
+            asset: {
                 id: asset.index,
                 name: asset.params.name,
                 symbol: asset.params['unit-name'],
@@ -229,12 +212,12 @@ router.get('/nfts/:assetId', async (ctx) => {
                         address: balance.address,
                         amount: balance.amount
                     }))
-            })
+            }
         }
     }
 })
 
-router.get('/nfts/type/:symbol', async (ctx) => {
+router.get('/nfts/type/:symbol', async ctx => {
     const symbol = ctx.params.symbol.toUpperCase()
     const response = await new AlgoIndexer().callRandLabsIndexerEndpoint(`assets?unit=${symbol}`)
 
@@ -255,23 +238,20 @@ router.get('/nfts/type/:symbol', async (ctx) => {
     ctx.body = { assets }
 })
 
-router.delete('/nfts/:assetId', async (ctx) => {
+router.delete('/nfts/:assetId', async ctx => {
     await new TokenRepository().deleteToken(ctx.params.assetId)
     ctx.body = ''
     ctx.status = 204
 })
 
-router.post('/nfts/:assetId/contracts/:applicationId', bodyparser(), async (ctx) => {
+router.post('/nfts/:assetId/contracts/:applicationId', bodyparser(), async ctx => {
     if (!ctx.request.body.contractInfo) throw new MissingParameterError('contractInfo')
     if (!ctx.request.body.sellerAddress) throw new MissingParameterError('sellerAddress')
     if (!ctx.request.body.assetPrice) throw new MissingParameterError('assetPrice')
     if (!ctx.request.body.assetPriceUnit) throw new MissingParameterError('assetPriceUnit')
 
     const algoIndexer = new AlgoIndexer()
-    const [assetResponse, appResponse] = await Promise.all([
-        algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}`),
-        algoIndexer.callAlgonodeIndexerEndpoint(`applications/${ctx.params.applicationId}`)
-    ])
+    const [assetResponse, appResponse] = await Promise.all([algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}`), algoIndexer.callAlgonodeIndexerEndpoint(`applications/${ctx.params.applicationId}`)])
 
     if (assetResponse.status !== 200 || !isValidAsset(assetResponse.json.asset)) {
         throw new AssetNotFoundError()
@@ -296,12 +276,9 @@ router.post('/nfts/:assetId/contracts/:applicationId', bodyparser(), async (ctx)
     ctx.status = 201
 })
 
-router.delete('/nfts/:assetId/contracts/:applicationId', async (ctx) => {
+router.delete('/nfts/:assetId/contracts/:applicationId', async ctx => {
     const algoIndexer = new AlgoIndexer()
-    const [assetResponse, appResponse] = await Promise.all([
-        algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}`),
-        algoIndexer.callAlgonodeIndexerEndpoint(`applications/${ctx.params.applicationId}`)
-    ])
+    const [assetResponse, appResponse] = await Promise.all([algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}`), algoIndexer.callAlgonodeIndexerEndpoint(`applications/${ctx.params.applicationId}`)])
 
     if (assetResponse.status !== 200 || !isValidAsset(assetResponse.json.asset)) {
         throw new AssetNotFoundError()
@@ -317,17 +294,43 @@ router.delete('/nfts/:assetId/contracts/:applicationId', async (ctx) => {
     ctx.status = 204
 })
 
-router.get('/accounts/:accountId/nfts/:symbol', async (ctx) => {
+router.get('/spp', async ctx => {
+    const spp = await new TokenRepository().getSpp()
+    ctx.body = { ...spp }
+})
+
+router.put('/spp', bodyparser(), async ctx => {
+    if (!isNumberOrUndef(ctx.request.body.capacity)) throw new TypeNumberError('capacity')
+    if (!isNumberOrUndef(ctx.request.body.output)) throw new TypeNumberError('output')
+    if (!isNumberOrUndef(ctx.request.body.totalTerracells)) throw new TypeNumberError('totalTerracells')
+    if (!isNumberOrUndef(ctx.request.body.activeTerracells)) throw new TypeNumberError('activeTerracells')
+
+    await new TokenRepository().putSpp({
+        contractInfo: ctx.request.body.contractInfo,
+        capacity: ctx.request.body.capacity,
+        output: ctx.request.body.output,
+        totalTerracells: ctx.request.body.totalTerracells,
+        activeTerracells: ctx.request.body.activeTerracells
+    })
+
+    ctx.body = ''
+    ctx.status = 204
+})
+
+router.get('/accounts/:accountId/nfts/:symbol', async ctx => {
     const symbol = ctx.params.symbol.toUpperCase()
     const response = await new AlgoIndexer().callRandLabsIndexerEndpoint(`accounts/${ctx.params.accountId}/assets`)
 
-    const algoAssets = response.status !== 200 ? [] : response.json.assets
-        .filter(asset => !asset.deleted && asset.amount === 1 && asset.decimals === 0 && asset['unit-name'] === symbol)
-        .map(asset => ({
-            id: asset['asset-id'],
-            name: asset.name,
-            symbol: asset['unit-name']
-        }))
+    const algoAssets =
+        response.status !== 200
+            ? []
+            : response.json.assets
+                  .filter(asset => !asset.deleted && asset.amount === 1 && asset.decimals === 0 && asset['unit-name'] === symbol)
+                  .map(asset => ({
+                      id: asset['asset-id'],
+                      name: asset.name,
+                      symbol: asset['unit-name']
+                  }))
 
     const tokenRepository = new TokenRepository()
     const dbCalls = algoAssets.map(asset => tokenRepository.getToken(asset.id))
@@ -337,7 +340,7 @@ router.get('/accounts/:accountId/nfts/:symbol', async (ctx) => {
     ctx.body = { assets }
 })
 
-router.post('/ipfs/files', bodyparser(), async (ctx) => {
+router.post('/ipfs/files', bodyparser(), async ctx => {
     if (!ctx.request.body.assetName) throw new MissingParameterError('assetName')
     if (!ctx.request.body.assetDescription) throw new MissingParameterError('assetDescription')
     if (!ctx.request.body.fileName) throw new MissingParameterError('fileName')
@@ -373,8 +376,4 @@ router.post('/files/upload', bodyparser(), async ctx => {
     ctx.status = 201
 })
 
-app
-    .use(requestLogger)
-    .use(errorHandler)
-    .use(router.routes())
-    .use(router.allowedMethods())
+app.use(requestLogger).use(errorHandler).use(router.routes()).use(router.allowedMethods())

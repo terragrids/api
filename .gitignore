@@ -17,4 +17,7 @@
 .env.test.local
 .env.production.local
 
+/.vscode/*
+!/.vscode/settings.json
+
 npm-debug.log*
