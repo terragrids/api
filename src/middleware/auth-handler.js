@@ -8,6 +8,7 @@ export default async function authHandler(ctx, next) {
     await next()
     //check if path is allow for non auth
     if (!nonAuthenticatePath.includes(ctx.request.url)) {
+        const accountId = ctx.headers?.walletAddress
         const token = ctx.headers?.authorization?.split(' ')
         if (token?.length !== 2) throw new TokenInvalidError()
 
@@ -25,7 +26,7 @@ export default async function authHandler(ctx, next) {
         // parse the note back to utf-8
         const note = new TextDecoder().decode(toCheck.note)
         const decodedNote = note.split(' ')
-        const accoundId = decodedNote[2]
+        const tokenAccountId = decodedNote[2]
         // "from" and "to" are distincts ArrayBuffers,
         // comparing them directly would always return false.
         // We therefore convert them back to base32 for comparison.
@@ -45,7 +46,8 @@ export default async function authHandler(ctx, next) {
             from === to &&
             // It is crucial to verify this or an attacker could sign
             // their own valid token and log into any account!
-            from === accoundId
+            from === accoundId &&
+            tokenAccountId === accountId
         ) {
             // verify signature and return if it succeeds
             const verified = await nobleEd25519.verify(signature, toCheck.bytesToSign(), toCheck.from.publicKey)
