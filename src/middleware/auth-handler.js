@@ -2,7 +2,7 @@ import * as nobleEd25519 from '@noble/ed25519'
 import algosdk from 'algosdk'
 import { TokenInvalidError } from '../error/token-invalid.js'
 import { day1, minutes30 } from '../utils/constants.js'
-import { nonAuthenticatePath } from '../utils/non-authenticate-path.js'
+import { nonAuthenticatePath } from '../utils/no-auth-path.js'
 
 export default async function authHandler(ctx, next) {
     await next()
