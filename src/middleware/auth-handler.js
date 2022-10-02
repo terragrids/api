@@ -1,4 +1,4 @@
-import * as nobleEd25519 from '@noble/ed25519'
+import { verify } from '@noble/ed25519'
 import algosdk from 'algosdk'
 import { TokenInvalidError } from '../error/token-invalid.js'
 import { day1, minutes30 } from '../utils/constants.js'
@@ -46,11 +46,11 @@ export default async function authHandler(ctx, next) {
             from === to &&
             // It is crucial to verify this or an attacker could sign
             // their own valid token and log into any account!
-            from === accoundId &&
+            from === accountId &&
             tokenAccountId === accountId
         ) {
             // verify signature and return if it succeeds
-            const verified = await nobleEd25519.verify(signature, toCheck.bytesToSign(), toCheck.from.publicKey)
+            const verified = await verify(signature, toCheck.bytesToSign(), toCheck.from.publicKey)
             if (verified) {
                 return
             }
