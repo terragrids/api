@@ -1,8 +1,9 @@
 import { verify } from '@noble/ed25519'
 import algosdk from 'algosdk'
-import { TokenInvalidError } from '../error/token-invalid.js'
+import { TokenInvalidError } from '../error/token-invalid-error.js'
 import { day1, minutes30 } from '../utils/constants.js'
 import { authenticatePath } from '../utils/auth-path.js'
+import { TokenExpiredError } from '../error/token-expired-error.js'
 
 export default async function authHandler(ctx, next) {
     await next()
@@ -35,7 +36,7 @@ export default async function authHandler(ctx, next) {
         // Guard clause to make sure the token has not expired.
         // We also check the token expiration is not too far out, which would be a red flag.
         if (Number(decodedNote[1]) < Date.now() || Number(decodedNote[1]) > Date.now() + day1 + minutes30) {
-            throw new Error('Token expired, authenticate again')
+            throw new TokenExpiredError()
         }
 
         // We check if the params match the ones we set in the front-end
@@ -55,6 +56,6 @@ export default async function authHandler(ctx, next) {
                 return
             }
         }
-        throw new Error('Invalid authentication')
+        throw new TokenInvalidError()
     }
 }

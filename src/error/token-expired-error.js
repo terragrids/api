@@ -1,7 +1,7 @@
 import GenericError from './generic-error.js'
 
-export class TokenInvalidError extends GenericError {
-    httpCode = 400
+export class TokenExpiredError extends GenericError {
+    httpCode = 401
     message
 
     constructor() {
@@ -10,8 +10,8 @@ export class TokenInvalidError extends GenericError {
 
     toJson() {
         return {
-            error: 'TokenInvalidError',
-            message: 'Invalid token'
+            error: 'TokenExpiredError',
+            message: 'Token expired'
         }
     }
 }
