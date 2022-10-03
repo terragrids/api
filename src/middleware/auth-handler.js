@@ -2,12 +2,12 @@ import { verify } from '@noble/ed25519'
 import algosdk from 'algosdk'
 import { TokenInvalidError } from '../error/token-invalid.js'
 import { day1, minutes30 } from '../utils/constants.js'
-import { nonAuthenticatePath } from '../utils/no-auth-path.js'
+import { authenticatePath } from '../utils/auth-path.js'
 
 export default async function authHandler(ctx, next) {
     await next()
     //check if path is allow for non auth
-    if (!nonAuthenticatePath.includes(ctx.request.url)) {
+    if (authenticatePath.includes(ctx.request.url)) {
         const accountId = ctx.headers?.walletAddress
         const token = ctx.headers?.authorization?.split(' ')
         if (token?.length !== 2) throw new TokenInvalidError()
