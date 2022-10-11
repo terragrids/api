@@ -9,7 +9,7 @@ export default async function authHandler(ctx, next) {
     await next()
     //check if path is allow for non auth
     if (authenticatePath.includes(ctx.request.url)) {
-        const accountId = ctx.headers?.walletAddress
+        const accountId = ctx.headers?.walletaddress
         const token = ctx.headers?.authorization?.split(' ')
         if (token?.length !== 2) throw new TokenInvalidError()
 
@@ -43,12 +43,11 @@ export default async function authHandler(ctx, next) {
         if (
             toCheck.firstRound === 10 &&
             toCheck.lastRound === 10 &&
-            decodedNote[0] === process.env.AUTH_SECRET &&
+            decodedNote[0] === 'https://testnet.terragrids.org/' &&
             from === to &&
             // It is crucial to verify this or an attacker could sign
             // their own valid token and log into any account!
-            from === accountId &&
-            tokenAccountId === accountId
+            from === accountId
         ) {
             // verify signature and return if it succeeds
             const verified = await verify(signature, toCheck.bytesToSign(), toCheck.from.publicKey)
