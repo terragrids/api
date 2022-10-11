@@ -27,7 +27,6 @@ export default async function authHandler(ctx, next) {
         // parse the note back to utf-8
         const note = new TextDecoder().decode(toCheck.note)
         const decodedNote = note.split(' ')
-        const tokenAccountId = decodedNote[2]
         // "from" and "to" are distincts ArrayBuffers,
         // comparing them directly would always return false.
         // We therefore convert them back to base32 for comparison.
