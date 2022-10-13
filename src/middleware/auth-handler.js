@@ -6,7 +6,6 @@ import { authenticatePath } from '../utils/auth-path.js'
 import { TokenExpiredError } from '../error/token-expired-error.js'
 
 export default async function authHandler(ctx, next) {
-    await next()
     //check if path is allow for non auth
     const accountId = ctx.headers?.walletaddress
     const token = ctx.headers?.authorization?.split(' ')
@@ -50,6 +49,7 @@ export default async function authHandler(ctx, next) {
         // verify signature and return if it succeeds
         const verified = await verify(signature, toCheck.bytesToSign(), toCheck.from.publicKey)
         if (verified) {
+            await next()
             return
         }
     }
