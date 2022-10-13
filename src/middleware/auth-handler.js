@@ -34,12 +34,12 @@ export default async function authHandler(ctx, next) {
     if (Number(decodedNote[1]) < Date.now() || Number(decodedNote[1]) > Date.now() + day1 + minutes30) {
         throw new TokenExpiredError()
     }
-
     // We check if the params match the ones we set in the front-end
+    const env = process.env.ENV === 'dev' ? 'testnet' : 'app'
     if (
         toCheck.firstRound === 10 &&
         toCheck.lastRound === 10 &&
-        decodedNote[0] === 'https://testnet.terragrids.org/' &&
+        decodedNote[0] === `https://${env}.terragrids.org/` &&
         from === to &&
         // It is crucial to verify this or an attacker could sign
         // their own valid token and log into any account!
