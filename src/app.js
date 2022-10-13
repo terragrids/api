@@ -19,6 +19,7 @@ import { TypePositiveNumberError } from './error/type-positive-number.error.js'
 import { TypeNumberError } from './error/type-number.error.js'
 import { NftTypeError } from './error/nft-type.error.js'
 import DynamoDbRepository from './repository/dynamodb.repository.js'
+import authHandler from './middleware/auth-handler.js'
 
 dotenv.config()
 export const app = new Koa()
@@ -373,6 +374,11 @@ router.post('/files/upload', bodyparser(), async ctx => {
         id: response.id,
         url: response.url
     }
+    ctx.status = 201
+})
+
+router.post('/project', authHandler, async ctx => {
+    //..
     ctx.status = 201
 })
 
