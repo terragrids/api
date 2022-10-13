@@ -21,6 +21,12 @@ jest.mock('./repository/dynamodb.repository.js', () =>
     }))
 )
 
+jest.mock('./middleware/auth-handler.js', () =>
+    jest.fn().mockImplementation((ctx, next) => {
+        next()
+    })
+)
+
 const mockTokenRepository = {
     getToken: jest.fn().mockImplementation(() => jest.fn()),
     putTrclToken: jest.fn().mockImplementation(() => jest.fn()),
@@ -2938,6 +2944,13 @@ describe('app', function () {
                 error: 'MissingParameterError',
                 message: 'contentType must be specified'
             })
+        })
+    })
+
+    describe('post project', function () {
+        it('should return 201 when calling project endpoint', async () => {
+            const response = await request(app.callback()).post('/project?')
+            expect(response.status).toBe(201)
         })
     })
 })
