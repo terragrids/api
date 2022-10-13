@@ -377,7 +377,8 @@ router.post('/files/upload', bodyparser(), async ctx => {
     ctx.status = 201
 })
 
-router.post('/project', authHandler, async ctx =>{
+router.post('/project', authHandler, async ctx => {
+    //..
     ctx.status = 201
 })
 
