@@ -2,7 +2,6 @@ import { verify } from '@noble/ed25519'
 import algosdk from 'algosdk'
 import { TokenInvalidError } from '../error/token-invalid-error.js'
 import { day1, minutes30 } from '../utils/constants.js'
-import { authenticatePath } from '../utils/auth-path.js'
 import { TokenExpiredError } from '../error/token-expired-error.js'
 
 export default async function authHandler(ctx, next) {
