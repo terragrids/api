@@ -6,7 +6,7 @@ import { TokenExpiredError } from '../error/token-expired-error.js'
 
 export default async function authHandler(ctx, next) {
     //check if path is allow for non auth
-    const accountId = ctx.headers?.walletaddress
+    const { wallet } = ctx.query
     const token = ctx.headers?.authorization?.split(' ')
     if (token?.length !== 2) throw new TokenInvalidError()
 
@@ -43,7 +43,7 @@ export default async function authHandler(ctx, next) {
         from === to &&
         // It is crucial to verify this or an attacker could sign
         // their own valid token and log into any account!
-        from === accountId
+        from === wallet
     ) {
         // verify signature and return if it succeeds
         const verified = await verify(signature, toCheck.bytesToSign(), toCheck.from.publicKey)
