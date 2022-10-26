@@ -30,10 +30,9 @@ export default class IpfsRepository {
     async pinJson({ assetName, assetDescription, fileIpfsHash, fileName, fileMimetype, options = {} }) {
         try {
             const fileIntegrity = this.convertIpfsCidV0ToByte32(fileIpfsHash)
-            const name = `${assetName}@arc3`
 
             const metadata = {
-                name,
+                name: assetName,
                 description: assetDescription,
                 image: `ipfs://${fileIpfsHash}`,
                 image_integrity: `sha256-${fileIntegrity}`,
@@ -50,7 +49,7 @@ export default class IpfsRepository {
 
             return {
                 ...result,
-                assetName: name,
+                assetName,
                 integrity: jsonIntegrity
             }
         } catch (e) {
