@@ -20,6 +20,7 @@ import { TypeNumberError } from './error/type-number.error.js'
 import { NftTypeError } from './error/nft-type.error.js'
 import DynamoDbRepository from './repository/dynamodb.repository.js'
 import authHandler from './middleware/auth-handler.js'
+import AuthRepository from './repository/auth.repository.js'
 
 dotenv.config()
 export const app = new Koa()
@@ -380,6 +381,14 @@ router.post('/files/upload', bodyparser(), async ctx => {
 router.post('/project', authHandler, async ctx => {
     //..
     ctx.status = 201
+})
+
+router.get('/auth', async ctx => {
+    if (!ctx.request.query.wallet) throw new MissingParameterError('wallet')
+
+    const authMessage = await new AuthRepository().getAuthMessage(ctx.request.query.wallet)
+    ctx.body = authMessage
+    ctx.status = 200
 })
 
 app.use(requestLogger).use(errorHandler).use(router.routes()).use(router.allowedMethods())
