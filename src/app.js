@@ -384,7 +384,9 @@ router.post('/project', authHandler, async ctx => {
 })
 
 router.get('/auth', async ctx => {
-    const authMessage = await new AuthRepository().getAuthMessage()
+    if (!ctx.request.query.wallet) throw new MissingParameterError('wallet')
+
+    const authMessage = await new AuthRepository().getAuthMessage(ctx.request.query.wallet)
     ctx.body = authMessage
     ctx.status = 200
 })

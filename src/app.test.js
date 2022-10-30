@@ -2967,13 +2967,25 @@ describe('app', function () {
         it('should return 200 when getting auth message', async () => {
             mockAuthRepository.getAuthMessage.mockImplementation(() => Promise.resolve({ test: true }))
 
-            const response = await request(app.callback()).get('/auth')
+            const response = await request(app.callback()).get('/auth?wallet=test-wallet')
 
             expect(mockAuthRepository.getAuthMessage).toHaveBeenCalledTimes(1)
-            expect(mockAuthRepository.getAuthMessage).toHaveBeenCalledWith()
+            expect(mockAuthRepository.getAuthMessage).toHaveBeenCalledWith('test-wallet')
 
             expect(response.status).toBe(200)
             expect(response.body).toEqual({ test: true })
+        })
+
+        it('should return 400 when getting auth message without wallet parameter', async () => {
+            const response = await request(app.callback()).get('/auth')
+
+            expect(mockAuthRepository.getAuthMessage).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(400)
+            expect(response.body).toEqual({
+                error: 'MissingParameterError',
+                message: 'wallet must be specified'
+            })
         })
     })
 })
