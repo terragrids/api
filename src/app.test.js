@@ -27,6 +27,15 @@ jest.mock('./middleware/auth-handler.js', () =>
     })
 )
 
+const mockAuthRepository = {
+    getAuthMessage: jest.fn().mockImplementation(() => jest.fn())
+}
+jest.mock('./repository/auth.repository.js', () =>
+    jest.fn().mockImplementation(() => ({
+        getAuthMessage: mockAuthRepository.getAuthMessage
+    }))
+)
+
 const mockTokenRepository = {
     getToken: jest.fn().mockImplementation(() => jest.fn()),
     putTrclToken: jest.fn().mockImplementation(() => jest.fn()),
@@ -2951,6 +2960,20 @@ describe('app', function () {
         it('should return 201 when calling project endpoint', async () => {
             const response = await request(app.callback()).post('/project?')
             expect(response.status).toBe(201)
+        })
+    })
+
+    describe('get auth', function () {
+        it('should return 200 when getting auth message', async () => {
+            mockAuthRepository.getAuthMessage.mockImplementation(() => Promise.resolve({ test: true }))
+
+            const response = await request(app.callback()).get('/auth')
+
+            expect(mockAuthRepository.getAuthMessage).toHaveBeenCalledTimes(1)
+            expect(mockAuthRepository.getAuthMessage).toHaveBeenCalledWith()
+
+            expect(response.status).toBe(200)
+            expect(response.body).toEqual({ test: true })
         })
     })
 })
