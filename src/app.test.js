@@ -22,8 +22,8 @@ jest.mock('./repository/dynamodb.repository.js', () =>
 )
 
 jest.mock('./middleware/auth-handler.js', () =>
-    jest.fn().mockImplementation((ctx, next) => {
-        next()
+    jest.fn().mockImplementation(async (ctx, next) => {
+        await next()
     })
 )
 
