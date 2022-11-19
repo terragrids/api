@@ -37,10 +37,10 @@
         "@babel/core": "^7.20.2",
         "@babel/eslint-parser": "^7.19.1",
         "@babel/preset-env": "^7.20.2",
-        "babel-jest": "^28.1.0",
+        "babel-jest": "^29.3.1",
         "eslint": "^8.28.0",
         "eslint-plugin-jest": "^26.4.6",
-        "jest": "^28.1.0",
+        "jest": "^29.3.1",
         "supertest": "^6.3.1"
     }
 }
