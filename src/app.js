@@ -14,7 +14,7 @@ import ApplicationStillRunningError from './error/application-still-running.erro
 import IpfsRepository from './repository/ipfs.repository.js'
 import S3Repository from './repository/s3.repository.js'
 import { filterAlgoAssetsByDbAssets, isValidAsset, TRBD, TRCL, TRLD } from './utils/assets.js'
-import { isNumber, isNumberOrUndef, isPositiveNumber } from './utils/validators.js'
+import { isNumberOrUndef, isPositiveNumber } from './utils/validators.js'
 import { TypePositiveNumberError } from './error/type-positive-number.error.js'
 import { TypeNumberError } from './error/type-number.error.js'
 import { NftTypeError } from './error/nft-type.error.js'
@@ -161,28 +161,21 @@ router.post('/nfts', bodyparser(), async ctx => {
         if (!power) throw new MissingParameterError('power')
         if (!isPositiveNumber(power)) throw new TypePositiveNumberError('power')
 
-        await new TokenRepository().putTrclToken({
+        await new TokenRepository().putToken({
             assetId: ctx.request.body.assetId,
             symbol: ctx.request.body.symbol,
             offchainUrl: ctx.request.body.offchainUrl,
-            power
+            power,
+            positionX,
+            positionY
         })
-    } else if (symbol === TRLD) {
-        if (!isNumber(positionX)) throw new TypeNumberError('positionX')
-        if (!isNumber(positionY)) throw new TypeNumberError('positionY')
-
-        await new TokenRepository().putTrldToken({
+    } else if (symbol === TRLD || symbol === TRBD) {
+        await new TokenRepository().putToken({
             assetId: ctx.request.body.assetId,
             symbol: ctx.request.body.symbol,
             offchainUrl: ctx.request.body.offchainUrl,
             positionX,
             positionY
-        })
-    } else if (symbol === TRBD) {
-        await new TokenRepository().putTrbdToken({
-            assetId: ctx.request.body.assetId,
-            symbol: ctx.request.body.symbol,
-            offchainUrl: ctx.request.body.offchainUrl
         })
     } else {
         throw new NftTypeError()

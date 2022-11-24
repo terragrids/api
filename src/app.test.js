@@ -38,9 +38,7 @@ jest.mock('./repository/auth.repository.js', () =>
 
 const mockTokenRepository = {
     getToken: jest.fn().mockImplementation(() => jest.fn()),
-    putTrclToken: jest.fn().mockImplementation(() => jest.fn()),
-    putTrldToken: jest.fn().mockImplementation(() => jest.fn()),
-    putTrbdToken: jest.fn().mockImplementation(() => jest.fn()),
+    putToken: jest.fn().mockImplementation(() => jest.fn()),
     deleteToken: jest.fn().mockImplementation(() => jest.fn()),
     putTokenContract: jest.fn().mockImplementation(() => jest.fn()),
     deleteTokenContract: jest.fn().mockImplementation(() => jest.fn()),
@@ -50,9 +48,7 @@ const mockTokenRepository = {
 jest.mock('./repository/token.repository.js', () =>
     jest.fn().mockImplementation(() => ({
         getToken: mockTokenRepository.getToken,
-        putTrclToken: mockTokenRepository.putTrclToken,
-        putTrldToken: mockTokenRepository.putTrldToken,
-        putTrbdToken: mockTokenRepository.putTrbdToken,
+        putToken: mockTokenRepository.putToken,
         deleteToken: mockTokenRepository.deleteToken,
         putTokenContract: mockTokenRepository.putTokenContract,
         deleteTokenContract: mockTokenRepository.deleteTokenContract,
@@ -1945,8 +1941,8 @@ describe('app', function () {
                 power: 10
             })
 
-            expect(mockTokenRepository.putTrclToken).toHaveBeenCalledTimes(1)
-            expect(mockTokenRepository.putTrclToken).toHaveBeenCalledWith({
+            expect(mockTokenRepository.putToken).toHaveBeenCalledTimes(1)
+            expect(mockTokenRepository.putToken).toHaveBeenCalledWith({
                 assetId: '123',
                 symbol: 'TRCL',
                 offchainUrl: 'offchain_url',
@@ -1966,8 +1962,8 @@ describe('app', function () {
                 positionY: 7
             })
 
-            expect(mockTokenRepository.putTrldToken).toHaveBeenCalledTimes(1)
-            expect(mockTokenRepository.putTrldToken).toHaveBeenCalledWith({
+            expect(mockTokenRepository.putToken).toHaveBeenCalledTimes(1)
+            expect(mockTokenRepository.putToken).toHaveBeenCalledWith({
                 assetId: '123',
                 symbol: 'TRLD',
                 offchainUrl: 'offchain_url',
@@ -1986,8 +1982,8 @@ describe('app', function () {
                 offchainUrl: 'offchain_url'
             })
 
-            expect(mockTokenRepository.putTrbdToken).toHaveBeenCalledTimes(1)
-            expect(mockTokenRepository.putTrbdToken).toHaveBeenCalledWith({
+            expect(mockTokenRepository.putToken).toHaveBeenCalledTimes(1)
+            expect(mockTokenRepository.putToken).toHaveBeenCalledWith({
                 assetId: '123',
                 symbol: 'TRBD',
                 offchainUrl: 'offchain_url'
@@ -2004,9 +2000,9 @@ describe('app', function () {
                 offchainUrl: 'offchain_url'
             })
 
-            expect(mockTokenRepository.putTrclToken).not.toHaveBeenCalled()
-            expect(mockTokenRepository.putTrldToken).not.toHaveBeenCalled()
-            expect(mockTokenRepository.putTrbdToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
 
             expect(response.status).toBe(400)
             expect(response.body).toEqual({
@@ -2021,9 +2017,9 @@ describe('app', function () {
                 offchainUrl: 'offchain_url'
             })
 
-            expect(mockTokenRepository.putTrclToken).not.toHaveBeenCalled()
-            expect(mockTokenRepository.putTrldToken).not.toHaveBeenCalled()
-            expect(mockTokenRepository.putTrbdToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
 
             expect(response.status).toBe(400)
             expect(response.body).toEqual({
@@ -2038,9 +2034,9 @@ describe('app', function () {
                 offchainUrl: 'offchain_url'
             })
 
-            expect(mockTokenRepository.putTrclToken).not.toHaveBeenCalled()
-            expect(mockTokenRepository.putTrldToken).not.toHaveBeenCalled()
-            expect(mockTokenRepository.putTrbdToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
 
             expect(response.status).toBe(400)
             expect(response.body).toEqual({
@@ -2055,9 +2051,9 @@ describe('app', function () {
                 symbol: 'TRCL'
             })
 
-            expect(mockTokenRepository.putTrclToken).not.toHaveBeenCalled()
-            expect(mockTokenRepository.putTrldToken).not.toHaveBeenCalled()
-            expect(mockTokenRepository.putTrbdToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
 
             expect(response.status).toBe(400)
             expect(response.body).toEqual({
@@ -2073,9 +2069,9 @@ describe('app', function () {
                 offchainUrl: 'offchain_url'
             })
 
-            expect(mockTokenRepository.putTrclToken).not.toHaveBeenCalled()
-            expect(mockTokenRepository.putTrldToken).not.toHaveBeenCalled()
-            expect(mockTokenRepository.putTrbdToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
 
             expect(response.status).toBe(400)
             expect(response.body).toEqual({
@@ -2092,9 +2088,9 @@ describe('app', function () {
                 power: 'meh'
             })
 
-            expect(mockTokenRepository.putTrclToken).not.toHaveBeenCalled()
-            expect(mockTokenRepository.putTrldToken).not.toHaveBeenCalled()
-            expect(mockTokenRepository.putTrbdToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
 
             expect(response.status).toBe(400)
             expect(response.body).toEqual({
@@ -2111,52 +2107,14 @@ describe('app', function () {
                 power: -12
             })
 
-            expect(mockTokenRepository.putTrclToken).not.toHaveBeenCalled()
-            expect(mockTokenRepository.putTrldToken).not.toHaveBeenCalled()
-            expect(mockTokenRepository.putTrbdToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
 
             expect(response.status).toBe(400)
             expect(response.body).toEqual({
                 error: 'TypePositiveNumberError',
                 message: 'power must be a positive number'
-            })
-        })
-
-        it('should return 400 when posting trld nft and positionX missing', async () => {
-            const response = await request(app.callback()).post('/nfts').send({
-                assetId: '123',
-                symbol: 'TRLD',
-                offchainUrl: 'offchain_url',
-                positionY: 10
-            })
-
-            expect(mockTokenRepository.putTrclToken).not.toHaveBeenCalled()
-            expect(mockTokenRepository.putTrldToken).not.toHaveBeenCalled()
-            expect(mockTokenRepository.putTrbdToken).not.toHaveBeenCalled()
-
-            expect(response.status).toBe(400)
-            expect(response.body).toEqual({
-                error: 'TypeNumberError',
-                message: 'positionX must be a number'
-            })
-        })
-
-        it('should return 400 when posting trld nft and positionY missing', async () => {
-            const response = await request(app.callback()).post('/nfts').send({
-                assetId: '123',
-                symbol: 'TRLD',
-                offchainUrl: 'offchain_url',
-                positionX: 10
-            })
-
-            expect(mockTokenRepository.putTrclToken).not.toHaveBeenCalled()
-            expect(mockTokenRepository.putTrldToken).not.toHaveBeenCalled()
-            expect(mockTokenRepository.putTrbdToken).not.toHaveBeenCalled()
-
-            expect(response.status).toBe(400)
-            expect(response.body).toEqual({
-                error: 'TypeNumberError',
-                message: 'positionY must be a number'
             })
         })
     })

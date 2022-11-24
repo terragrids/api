@@ -6,57 +6,50 @@ import DynamoDbRepository from './dynamodb.repository.js'
 export default class TokenRepository extends DynamoDbRepository {
     pkTokenPrefix = 'asset'
     pkSolarPowerPlantPrefix = 'spp'
+    symbolPrefix = 'symbol'
     itemName = 'token'
 
-    async putTrclToken({ assetId, symbol, offchainUrl, power }) {
-        const params = {
-            TransactItems: [
-                this.getUpdateCountersTnxCommand({
-                    key: { pk: { S: this.pkSolarPowerPlantPrefix } },
-                    counters: [
-                        {
-                            name: 'powerCapacity',
-                            change: power.toString()
-                        }
-                    ]
-                }),
-                this.getPutTnxCommand({
+    async putToken({ assetId, symbol, offchainUrl, power, positionX, positionY }) {
+        // If the token is a Terracell NFT, add power capacity to the Solar Power Plant
+        if (power) {
+            const params = {
+                TransactItems: [
+                    this.getUpdateCountersTnxCommand({
+                        key: { pk: { S: this.pkSolarPowerPlantPrefix } },
+                        counters: [
+                            {
+                                name: 'powerCapacity',
+                                change: power.toString()
+                            }
+                        ]
+                    }),
+                    this.getPutTnxCommand({
+                        pk: { S: `${this.pkTokenPrefix}|${assetId}` },
+                        gsi1pk: { S: `${this.symbolPrefix}|${symbol}` },
+                        offchainUrl: { S: offchainUrl },
+                        power: { N: power.toString() },
+                        positionX: { N: positionX.toString() },
+                        positionY: { N: positionY.toString() }
+                    })
+                ]
+            }
+            return await this.transactWrite({
+                params,
+                itemLogName: this.itemName
+            })
+        } else {
+            // If the token is a Terraland or a Terrabuild NFT, just save it
+            return await this.put({
+                item: {
                     pk: { S: `${this.pkTokenPrefix}|${assetId}` },
-                    symbol: { S: symbol },
+                    gsi1pk: { S: `${this.symbolPrefix}|${symbol}` },
                     offchainUrl: { S: offchainUrl },
-                    power: { N: power.toString() }
-                })
-            ]
+                    positionX: { N: positionX.toString() },
+                    positionY: { N: positionY.toString() }
+                },
+                itemLogName: this.itemName
+            })
         }
-
-        return await this.transactWrite({
-            params,
-            itemLogName: this.itemName
-        })
-    }
-
-    async putTrldToken({ assetId, symbol, offchainUrl, positionX, positionY }) {
-        return await this.put({
-            item: {
-                pk: { S: `${this.pkTokenPrefix}|${assetId}` },
-                symbol: { S: symbol },
-                offchainUrl: { S: offchainUrl },
-                positionX: { N: positionX.toString() },
-                positionY: { N: positionY.toString() }
-            },
-            itemLogName: this.itemName
-        })
-    }
-
-    async putTrbdToken({ assetId, symbol, offchainUrl }) {
-        return await this.put({
-            item: {
-                pk: { S: `${this.pkTokenPrefix}|${assetId}` },
-                symbol: { S: symbol },
-                offchainUrl: { S: offchainUrl }
-            },
-            itemLogName: this.itemName
-        })
     }
 
     async getToken(assetId) {
@@ -66,10 +59,19 @@ export default class TokenRepository extends DynamoDbRepository {
                 itemLogName: this.itemName
             })
 
-            return data.Item && data.Item.symbol
+            let symbol
+            if (data.Item && data.Item.gsi1pk) {
+                symbol = data.Item.gsi1pk.S.replace('symbol|', '')
+            } else if (data.Item && data.Item.symbol) {
+                symbol = data.Item.symbol.S
+            } else {
+                symbol = null
+            }
+
+            return data.Item && symbol
                 ? {
                       id: assetId,
-                      symbol: data.Item.symbol.S,
+                      symbol,
                       ...(data.Item.offchainUrl && data.Item.offchainUrl.S && { offchainUrl: data.Item.offchainUrl.S }),
                       ...(data.Item.applicationId && data.Item.applicationId.S && { contractId: data.Item.applicationId.S }),
                       ...(data.Item.contractInfo && data.Item.contractInfo.S && { contractInfo: data.Item.contractInfo.S }),
