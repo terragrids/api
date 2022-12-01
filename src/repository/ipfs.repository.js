@@ -27,20 +27,43 @@ export default class IpfsRepository {
         }
     }
 
-    async pinJson({ assetName, assetDescription, fileIpfsHash, fileName, fileMimetype, options = {} }) {
+    async pinJson({ assetName, assetDescription, assetProperties, fileIpfsHash, fileName, fileMimetype, options = {} }) {
         try {
             const fileIntegrity = this.convertIpfsCidV0ToByte32(fileIpfsHash)
+            const imageIntegrity = `sha256-${fileIntegrity}`
 
             const metadata = {
                 name: assetName,
                 description: assetDescription,
                 image: `ipfs://${fileIpfsHash}`,
-                image_integrity: `sha256-${fileIntegrity}`,
+                image_integrity: imageIntegrity,
                 image_mimetype: fileMimetype,
                 properties: {
                     file_url: fileName,
-                    file_url_integrity: `sha256-${fileIntegrity}`,
-                    file_url_mimetype: fileMimetype
+                    file_url_integrity: imageIntegrity,
+                    file_url_mimetype: fileMimetype,
+                    base_price: {
+                        name: 'base price',
+                        value: assetProperties.price,
+                        display_value: `${assetProperties.price} ALGO`
+                    },
+                    rarity: {
+                        name: 'rarity',
+                        value: assetProperties.rarity,
+                        display_value: assetProperties.rarity
+                    },
+                    author: {
+                        name: 'author',
+                        value: assetProperties.author,
+                        display_value: assetProperties.author
+                    },
+                    ...(assetProperties.power && {
+                        power: {
+                            name: 'power',
+                            value: assetProperties.power,
+                            display_value: `${assetProperties.power} TRW`
+                        }
+                    })
                 }
             }
 

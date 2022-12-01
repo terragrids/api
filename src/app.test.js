@@ -2795,11 +2795,14 @@ describe('app', function () {
                 })
             })
 
-            const response = await request(app.callback()).post('/ipfs/files').send({
-                assetName: 'asset name',
-                assetDescription: 'asset description',
-                fileName: 'filename'
-            })
+            const response = await request(app.callback())
+                .post('/ipfs/files')
+                .send({
+                    assetName: 'asset name',
+                    assetDescription: 'asset description',
+                    assetProperties: { property: 'property' },
+                    fileName: 'filename'
+                })
 
             expect(mockS3Repository.getFileReadStream).toHaveBeenCalledTimes(1)
             expect(mockS3Repository.getFileReadStream).toHaveBeenCalledWith('filename')
@@ -2811,6 +2814,7 @@ describe('app', function () {
             expect(mockIpfsRepository.pinJson).toHaveBeenCalledWith({
                 assetName: 'asset name',
                 assetDescription: 'asset description',
+                assetProperties: { property: 'property' },
                 fileIpfsHash: 'FileIpfsHash',
                 fileName: 'filename',
                 fileMimetype: 'content/type'
@@ -2824,11 +2828,14 @@ describe('app', function () {
             })
         })
 
-        it('should return 400 when calling ipfs files endpoint and asset name info missing', async () => {
-            const response = await request(app.callback()).post('/ipfs/files').send({
-                assetDescription: 'asset description',
-                fileName: 'filename'
-            })
+        it('should return 400 when calling ipfs files endpoint and asset name missing', async () => {
+            const response = await request(app.callback())
+                .post('/ipfs/files')
+                .send({
+                    assetDescription: 'asset description',
+                    fileName: 'filename',
+                    assetProperties: { properties: 'properties' }
+                })
 
             expect(mockS3Repository.getFileReadStream).not.toHaveBeenCalled()
             expect(mockIpfsRepository.pinFile).not.toHaveBeenCalled()
@@ -2841,11 +2848,14 @@ describe('app', function () {
             })
         })
 
-        it('should return 400 when calling ipfs files endpoint and asset description info missing', async () => {
-            const response = await request(app.callback()).post('/ipfs/files').send({
-                assetName: 'asset name',
-                fileName: 'filename'
-            })
+        it('should return 400 when calling ipfs files endpoint and asset description missing', async () => {
+            const response = await request(app.callback())
+                .post('/ipfs/files')
+                .send({
+                    assetName: 'asset name',
+                    fileName: 'filename',
+                    assetProperties: { properties: 'properties' }
+                })
 
             expect(mockS3Repository.getFileReadStream).not.toHaveBeenCalled()
             expect(mockIpfsRepository.pinFile).not.toHaveBeenCalled()
@@ -2858,11 +2868,32 @@ describe('app', function () {
             })
         })
 
-        it('should return 400 when calling ipfs files endpoint and file name info missing', async () => {
+        it('should return 400 when calling ipfs files endpoint and asset properties missing', async () => {
             const response = await request(app.callback()).post('/ipfs/files').send({
                 assetName: 'asset name',
-                assetDescription: 'asset description'
+                assetDescription: 'asset description',
+                fileName: 'filename'
             })
+
+            expect(mockS3Repository.getFileReadStream).not.toHaveBeenCalled()
+            expect(mockIpfsRepository.pinFile).not.toHaveBeenCalled()
+            expect(mockIpfsRepository.pinJson).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(400)
+            expect(response.body).toEqual({
+                error: 'MissingParameterError',
+                message: 'assetProperties must be specified'
+            })
+        })
+
+        it('should return 400 when calling ipfs files endpoint and file name missing', async () => {
+            const response = await request(app.callback())
+                .post('/ipfs/files')
+                .send({
+                    assetName: 'asset name',
+                    assetDescription: 'asset description',
+                    assetProperties: { properties: 'properties' }
+                })
 
             expect(mockS3Repository.getFileReadStream).not.toHaveBeenCalled()
             expect(mockIpfsRepository.pinFile).not.toHaveBeenCalled()

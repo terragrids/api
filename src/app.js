@@ -338,6 +338,7 @@ router.get('/accounts/:accountId/nfts/:symbol', async ctx => {
 router.post('/ipfs/files', bodyparser(), async ctx => {
     if (!ctx.request.body.assetName) throw new MissingParameterError('assetName')
     if (!ctx.request.body.assetDescription) throw new MissingParameterError('assetDescription')
+    if (!ctx.request.body.assetProperties) throw new MissingParameterError('assetProperties')
     if (!ctx.request.body.fileName) throw new MissingParameterError('fileName')
 
     const s3 = new S3Repository()
@@ -348,6 +349,7 @@ router.post('/ipfs/files', bodyparser(), async ctx => {
     const resultMeta = await ipfs.pinJson({
         assetName: ctx.request.body.assetName,
         assetDescription: ctx.request.body.assetDescription,
+        assetProperties: ctx.request.body.assetProperties,
         fileIpfsHash: resultFile.IpfsHash,
         fileName: ctx.request.body.fileName,
         fileMimetype: s3Object.contentType
