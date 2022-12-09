@@ -28,8 +28,8 @@ export default class TokenRepository extends DynamoDbRepository {
                         gsi1pk: { S: `${this.symbolPrefix}|${symbol}` },
                         offchainUrl: { S: offchainUrl },
                         power: { N: power.toString() },
-                        positionX: { N: positionX.toString() },
-                        positionY: { N: positionY.toString() }
+                        ...(positionX && { positionX: { N: positionX.toString() } }),
+                        ...(positionY && { positionY: { N: positionY.toString() } })
                     })
                 ]
             }
@@ -44,8 +44,8 @@ export default class TokenRepository extends DynamoDbRepository {
                     pk: { S: `${this.pkTokenPrefix}|${assetId}` },
                     gsi1pk: { S: `${this.symbolPrefix}|${symbol}` },
                     offchainUrl: { S: offchainUrl },
-                    positionX: { N: positionX.toString() },
-                    positionY: { N: positionY.toString() }
+                    ...(positionX && { positionX: { N: positionX.toString() } }),
+                    ...(positionY && { positionY: { N: positionY.toString() } })
                 },
                 itemLogName: this.itemName
             })
