@@ -26,6 +26,7 @@ export default class TokenRepository extends DynamoDbRepository {
                     this.getPutTnxCommand({
                         pk: { S: `${this.pkTokenPrefix}|${assetId}` },
                         gsi1pk: { S: `${this.symbolPrefix}|${symbol}` },
+                        data: { S: `project||created|${Date.now()}` },
                         offchainUrl: { S: offchainUrl },
                         power: { N: power.toString() },
                         ...(positionX && { positionX: { N: positionX.toString() } }),
@@ -43,6 +44,7 @@ export default class TokenRepository extends DynamoDbRepository {
                 item: {
                     pk: { S: `${this.pkTokenPrefix}|${assetId}` },
                     gsi1pk: { S: `${this.symbolPrefix}|${symbol}` },
+                    data: { S: `project||created|${Date.now()}` },
                     offchainUrl: { S: offchainUrl },
                     ...(positionX && { positionX: { N: positionX.toString() } }),
                     ...(positionY && { positionY: { N: positionY.toString() } })
@@ -87,6 +89,33 @@ export default class TokenRepository extends DynamoDbRepository {
         } catch (e) {
             if (e instanceof ConditionalCheckFailedException) throw new AssetNotFoundError()
             else throw e
+        }
+    }
+
+    async getTokensBySymbol({ symbol, projectId = '', pageSize, nextPageKey, sort }) {
+        const forward = sort && sort === 'desc' ? false : true
+        const data = await this.query({
+            indexName: 'gsi1',
+            conditionExpression: 'gsi1pk = :gsi1pk AND begins_with(#data, :project)',
+            attributeNames: { '#data': 'data' },
+            attributeValues: {
+                ':gsi1pk': { S: `symbol|${symbol}` },
+                ':project': { S: `project|${projectId}|created|` }
+            },
+            pageSize,
+            nextPageKey,
+            forward,
+            itemLogName: 'assets'
+        })
+
+        return {
+            assets: data.items.map(asset => ({
+                id: asset.pk.S.replace(`${this.pkTokenPrefix}|`, ''),
+                ...(asset.data && { created: asset.data.S.split('|')[3] }),
+                ...(asset.name && { name: asset.name.S }),
+                ...(asset.offchainUrl && { offchainUrl: asset.offchainUrl.S })
+            })),
+            ...(data.nextPageKey && { nextPageKey: data.nextPageKey })
         }
     }
 

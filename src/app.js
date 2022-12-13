@@ -163,7 +163,7 @@ router.post('/nfts', bodyparser(), async ctx => {
 
         await new TokenRepository().putToken({
             assetId: ctx.request.body.assetId,
-            symbol: ctx.request.body.symbol,
+            symbol,
             offchainUrl: ctx.request.body.offchainUrl,
             power,
             positionX,
@@ -172,7 +172,7 @@ router.post('/nfts', bodyparser(), async ctx => {
     } else if (symbol === TRLD || symbol === TRBD) {
         await new TokenRepository().putToken({
             assetId: ctx.request.body.assetId,
-            symbol: ctx.request.body.symbol,
+            symbol,
             offchainUrl: ctx.request.body.offchainUrl,
             positionX,
             positionY
@@ -213,24 +213,25 @@ router.get('/nfts/:assetId', async ctx => {
 })
 
 router.get('/nfts/type/:symbol', async ctx => {
-    const symbol = ctx.params.symbol.toUpperCase()
-    const response = await new AlgoIndexer().callRandLabsIndexerEndpoint(`assets?unit=${symbol}`)
+    const dbResponse = await new TokenRepository().getTokensBySymbol({
+        symbol: ctx.params.symbol.toUpperCase(),
+        sort: ctx.request.query.sort,
+        pageSize: ctx.request.query.pageSize,
+        nextPageKey: ctx.request.query.nextPageKey
+    })
 
-    const algoAssets = response.json.assets
-        .filter(asset => !asset.deleted && asset.params.total === 1 && asset.params.decimals === 0)
-        .map(asset => ({
-            id: asset.index,
-            name: asset.params.name,
-            symbol: asset.params['unit-name'],
-            url: asset.params.url
-        }))
+    const indexerCalls = dbResponse.assets.map(asset => new AlgoIndexer().callAlgonodeIndexerEndpoint(`assets/${asset.id}`))
+    const indexerAssets = await Promise.all(indexerCalls)
 
-    const tokenRepository = new TokenRepository()
-    const dbCalls = algoAssets.map(asset => tokenRepository.getToken(asset.id))
-    const dbAssets = await Promise.all(dbCalls)
+    const assets = dbResponse.assets.reduce((result, dbAsset, index) => {
+        if (indexerAssets[index].status === 200 && !indexerAssets[index].json.asset.deleted) result.push({ ...dbAsset, name: indexerAssets[index].json.asset.params.name })
+        return result
+    }, [])
 
-    const assets = filterAlgoAssetsByDbAssets(algoAssets, dbAssets)
-    ctx.body = { assets }
+    ctx.body = {
+        assets,
+        nextPageKey: dbResponse.nextPageKey
+    }
 })
 
 router.delete('/nfts/:assetId', async ctx => {

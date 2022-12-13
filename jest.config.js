@@ -1,7 +1,7 @@
 export default {
     verbose: true,
     collectCoverage: true,
-    collectCoverageFrom: ['**/src/app.js', '**/src/utils/**'],
+    collectCoverageFrom: ['**/src/app.js', '**/src/utils/validators.js', '**/src/utils/uuid.js'],
     coveragePathIgnorePatterns: ['constants.js'],
     coverageThreshold: {
         global: {
