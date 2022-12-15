@@ -92,7 +92,7 @@ export default class TokenRepository extends DynamoDbRepository {
         }
     }
 
-    async getTokensBySymbol({ symbol, projectId = '', pageSize, nextPageKey, sort }) {
+    async getTokensBySymbol({ symbol, projectId = '', status = 'created', pageSize, nextPageKey, sort }) {
         const forward = sort && sort === 'desc' ? false : true
         const data = await this.query({
             indexName: 'gsi1',
@@ -100,7 +100,7 @@ export default class TokenRepository extends DynamoDbRepository {
             attributeNames: { '#data': 'data' },
             attributeValues: {
                 ':gsi1pk': { S: `symbol|${symbol}` },
-                ':project': { S: `project|${projectId}|created|` }
+                ':project': { S: `project|${projectId}|${status}|` }
             },
             pageSize,
             nextPageKey,
@@ -109,12 +109,19 @@ export default class TokenRepository extends DynamoDbRepository {
         })
 
         return {
-            assets: data.items.map(asset => ({
-                id: asset.pk.S.replace(`${this.pkTokenPrefix}|`, ''),
-                ...(asset.data && { created: asset.data.S.split('|')[3] }),
-                ...(asset.name && { name: asset.name.S }),
-                ...(asset.offchainUrl && { offchainUrl: asset.offchainUrl.S })
-            })),
+            assets: data.items.map(asset => {
+                const data = asset.data.S.split('|')
+                const status = data[2]
+                const date = data[3]
+                return {
+                    id: asset.pk.S.replace(`${this.pkTokenPrefix}|`, ''),
+                    status,
+                    statusChanged: date,
+                    ...(asset.name && { name: asset.name.S }),
+                    ...(asset.offchainUrl && { offchainUrl: asset.offchainUrl.S }),
+                    ...(asset.applicationId && { offchainUrl: asset.offchainUrl.S })
+                }
+            }),
             ...(data.nextPageKey && { nextPageKey: data.nextPageKey })
         }
     }

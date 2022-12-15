@@ -1316,10 +1316,17 @@ describe('app', function () {
                 })
             })
 
-            const response = await request(app.callback()).get('/nfts/type/trcl')
+            const response = await request(app.callback()).get('/nfts/type/trcl?projectId=project_id&status=created&sort=desc&pageSize=5&nextPageKey=next_page_key')
 
             expect(mockTokenRepository.getTokensBySymbol).toHaveBeenCalledTimes(1)
-            expect(mockTokenRepository.getTokensBySymbol).toHaveBeenCalledWith({ symbol: 'TRCL' })
+            expect(mockTokenRepository.getTokensBySymbol).toHaveBeenCalledWith({
+                symbol: 'TRCL',
+                nextPageKey: 'next_page_key',
+                pageSize: '5',
+                projectId: 'project_id',
+                sort: 'desc',
+                status: 'created'
+            })
 
             expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledTimes(2)
             expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/1')

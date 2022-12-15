@@ -215,6 +215,8 @@ router.get('/nfts/:assetId', async ctx => {
 router.get('/nfts/type/:symbol', async ctx => {
     const dbResponse = await new TokenRepository().getTokensBySymbol({
         symbol: ctx.params.symbol.toUpperCase(),
+        projectId: ctx.request.query.projectId,
+        status: ctx.request.query.status,
         sort: ctx.request.query.sort,
         pageSize: ctx.request.query.pageSize,
         nextPageKey: ctx.request.query.nextPageKey
