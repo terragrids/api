@@ -1279,7 +1279,7 @@ describe('app', function () {
             expect(response.body).toEqual({ assets: [] })
         })
 
-        it('should return 200 when calling nft type endpoint and assets found on db', async () => {
+        it('should return 200 when calling nft type endpoint and assets found on db and in indexer', async () => {
             mockTokenRepository.getTokensBySymbol.mockImplementation(() =>
                 Promise.resolve({
                     assets: [
@@ -1297,23 +1297,37 @@ describe('app', function () {
                 })
             )
             mockAlgoIndexer.callAlgonodeIndexerEndpoint.mockImplementation(path => {
-                const assetId = path.replace('assets/', '')
-                return Promise.resolve({
-                    status: 200,
-                    json: {
-                        asset: {
-                            index: assetId,
-                            deleted: false,
-                            params: {
-                                decimals: 0,
-                                name: `Terracell #${assetId}`,
-                                total: 1,
-                                'unit-name': 'TRCL',
-                                url: `https://terragrids.org#${assetId}`
+                const assetId = path.replace('assets/', '').replace('/balances?currency-greater-than=0', '')
+                if (path.includes('balances')) {
+                    return Promise.resolve({
+                        status: 200,
+                        json: {
+                            balances: [
+                                {
+                                    address: `address-${assetId}`,
+                                    amount: 1
+                                }
+                            ]
+                        }
+                    })
+                } else {
+                    return Promise.resolve({
+                        status: 200,
+                        json: {
+                            asset: {
+                                index: assetId,
+                                deleted: false,
+                                params: {
+                                    decimals: 0,
+                                    name: `Terracell #${assetId}`,
+                                    total: 1,
+                                    'unit-name': 'TRCL',
+                                    url: `https://terragrids.org#${assetId}`
+                                }
                             }
                         }
-                    }
-                })
+                    })
+                }
             })
 
             const response = await request(app.callback()).get('/nfts/type/trcl?projectId=project_id&status=created&sort=desc&pageSize=5&nextPageKey=next_page_key')
@@ -1328,9 +1342,11 @@ describe('app', function () {
                 status: 'created'
             })
 
-            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledTimes(2)
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledTimes(4)
             expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/1')
             expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/2')
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/1/balances?currency-greater-than=0')
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/2/balances?currency-greater-than=0')
 
             expect(response.status).toBe(200)
             expect(response.body).toEqual({
@@ -1339,13 +1355,25 @@ describe('app', function () {
                         id: '1',
                         name: 'Terracell #1',
                         offchainUrl: 'offchain_url_1',
-                        power: 11
+                        power: 11,
+                        holders: [
+                            {
+                                address: 'address-1',
+                                amount: 1
+                            }
+                        ]
                     },
                     {
                         id: '2',
                         name: 'Terracell #2',
                         offchainUrl: 'offchain_url_2',
-                        power: 15
+                        power: 15,
+                        holders: [
+                            {
+                                address: 'address-2',
+                                amount: 1
+                            }
+                        ]
                     }
                 ]
             })
@@ -1374,30 +1402,44 @@ describe('app', function () {
                 })
             )
             mockAlgoIndexer.callAlgonodeIndexerEndpoint.mockImplementation(path => {
-                const assetId = path.replace('assets/', '')
-                return assetId === '2'
-                    ? Promise.resolve({
-                          status: 404,
-                          json: {
-                              message: 'not found'
-                          }
-                      })
-                    : Promise.resolve({
-                          status: 200,
-                          json: {
-                              asset: {
-                                  index: assetId,
-                                  deleted: false,
-                                  params: {
-                                      decimals: 0,
-                                      name: `Terracell #${assetId}`,
-                                      total: 1,
-                                      'unit-name': 'TRCL',
-                                      url: `https://terragrids.org#${assetId}`
+                const assetId = path.replace('assets/', '').replace('/balances?currency-greater-than=0', '')
+                if (path.includes('balances')) {
+                    return Promise.resolve({
+                        status: 200,
+                        json: {
+                            balances: [
+                                {
+                                    address: `address-${assetId}`,
+                                    amount: 1
+                                }
+                            ]
+                        }
+                    })
+                } else {
+                    return assetId === '2'
+                        ? Promise.resolve({
+                              status: 404,
+                              json: {
+                                  message: 'not found'
+                              }
+                          })
+                        : Promise.resolve({
+                              status: 200,
+                              json: {
+                                  asset: {
+                                      index: assetId,
+                                      deleted: false,
+                                      params: {
+                                          decimals: 0,
+                                          name: `Terracell #${assetId}`,
+                                          total: 1,
+                                          'unit-name': 'TRCL',
+                                          url: `https://terragrids.org#${assetId}`
+                                      }
                                   }
                               }
-                          }
-                      })
+                          })
+                }
             })
 
             const response = await request(app.callback()).get('/nfts/type/trcl')
@@ -1405,10 +1447,14 @@ describe('app', function () {
             expect(mockTokenRepository.getTokensBySymbol).toHaveBeenCalledTimes(1)
             expect(mockTokenRepository.getTokensBySymbol).toHaveBeenCalledWith({ symbol: 'TRCL' })
 
-            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledTimes(3)
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledTimes(6)
             expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/1')
             expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/2')
             expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/3')
+
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/1/balances?currency-greater-than=0')
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/2/balances?currency-greater-than=0')
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/3/balances?currency-greater-than=0')
 
             expect(response.status).toBe(200)
             expect(response.body).toEqual({
@@ -1417,13 +1463,25 @@ describe('app', function () {
                         id: '1',
                         name: 'Terracell #1',
                         offchainUrl: 'offchain_url_1',
-                        power: 11
+                        power: 11,
+                        holders: [
+                            {
+                                address: 'address-1',
+                                amount: 1
+                            }
+                        ]
                     },
                     {
                         id: '3',
                         name: 'Terracell #3',
                         offchainUrl: 'offchain_url_3',
-                        power: 25
+                        power: 25,
+                        holders: [
+                            {
+                                address: 'address-3',
+                                amount: 1
+                            }
+                        ]
                     }
                 ]
             })
@@ -1453,23 +1511,37 @@ describe('app', function () {
                 })
             )
             mockAlgoIndexer.callAlgonodeIndexerEndpoint.mockImplementation(path => {
-                const assetId = path.replace('assets/', '')
-                return Promise.resolve({
-                    status: 200,
-                    json: {
-                        asset: {
-                            index: assetId,
-                            deleted: assetId === '2',
-                            params: {
-                                decimals: 0,
-                                name: `Terracell #${assetId}`,
-                                total: 1,
-                                'unit-name': 'TRCL',
-                                url: `https://terragrids.org#${assetId}`
+                const assetId = path.replace('assets/', '').replace('/balances?currency-greater-than=0', '')
+                if (path.includes('balances')) {
+                    return Promise.resolve({
+                        status: 200,
+                        json: {
+                            balances: [
+                                {
+                                    address: `address-${assetId}`,
+                                    amount: 1
+                                }
+                            ]
+                        }
+                    })
+                } else {
+                    return Promise.resolve({
+                        status: 200,
+                        json: {
+                            asset: {
+                                index: assetId,
+                                deleted: assetId === '2',
+                                params: {
+                                    decimals: 0,
+                                    name: `Terracell #${assetId}`,
+                                    total: 1,
+                                    'unit-name': 'TRCL',
+                                    url: `https://terragrids.org#${assetId}`
+                                }
                             }
                         }
-                    }
-                })
+                    })
+                }
             })
 
             const response = await request(app.callback()).get('/nfts/type/trcl')
@@ -1477,10 +1549,14 @@ describe('app', function () {
             expect(mockTokenRepository.getTokensBySymbol).toHaveBeenCalledTimes(1)
             expect(mockTokenRepository.getTokensBySymbol).toHaveBeenCalledWith({ symbol: 'TRCL' })
 
-            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledTimes(3)
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledTimes(6)
             expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/1')
             expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/2')
             expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/3')
+
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/1/balances?currency-greater-than=0')
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/2/balances?currency-greater-than=0')
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/3/balances?currency-greater-than=0')
 
             expect(response.status).toBe(200)
             expect(response.body).toEqual({
@@ -1489,13 +1565,25 @@ describe('app', function () {
                         id: '1',
                         name: 'Terracell #1',
                         offchainUrl: 'offchain_url_1',
-                        power: 11
+                        power: 11,
+                        holders: [
+                            {
+                                address: 'address-1',
+                                amount: 1
+                            }
+                        ]
                     },
                     {
                         id: '3',
                         name: 'Terracell #3',
                         offchainUrl: 'offchain_url_3',
-                        power: 25
+                        power: 25,
+                        holders: [
+                            {
+                                address: 'address-3',
+                                amount: 1
+                            }
+                        ]
                     }
                 ],
                 nextPageKey: 'next_page_key'

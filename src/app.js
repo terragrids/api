@@ -222,11 +222,19 @@ router.get('/nfts/type/:symbol', async ctx => {
         nextPageKey: ctx.request.query.nextPageKey
     })
 
-    const indexerCalls = dbResponse.assets.map(asset => new AlgoIndexer().callAlgonodeIndexerEndpoint(`assets/${asset.id}`))
-    const indexerAssets = await Promise.all(indexerCalls)
+    const algoIndexer = new AlgoIndexer()
+
+    const indexerCalls = dbResponse.assets.flatMap(asset => [algoIndexer.callAlgonodeIndexerEndpoint(`assets/${asset.id}`), algoIndexer.callAlgonodeIndexerEndpoint(`assets/${asset.id}/balances?currency-greater-than=0`)])
+    const indexerResults = await Promise.all(indexerCalls)
 
     const assets = dbResponse.assets.reduce((result, dbAsset, index) => {
-        if (indexerAssets[index].status === 200 && !indexerAssets[index].json.asset.deleted) result.push({ ...dbAsset, name: indexerAssets[index].json.asset.params.name })
+        const i = index * 2
+        if (indexerResults[i].status === 200 && !indexerResults[i].json.asset.deleted && indexerResults[i + 1].status === 200 && indexerResults[i + 1].json.balances)
+            result.push({
+                ...dbAsset,
+                name: indexerResults[i].json.asset.params.name,
+                holders: indexerResults[i + 1].json.balances.map(balance => ({ address: balance.address, amount: balance.amount }))
+            })
         return result
     }, [])
 
