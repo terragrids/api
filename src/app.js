@@ -187,7 +187,11 @@ router.post('/nfts', bodyparser(), async ctx => {
 
 router.get('/nfts/:assetId', async ctx => {
     const algoIndexer = new AlgoIndexer()
-    const [assetResponse, balancesResponse, offchainInfo] = await Promise.all([algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}`), algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}/balances`), new TokenRepository().getToken(ctx.params.assetId)])
+    const [assetResponse, balancesResponse, offchainInfo] = await Promise.all([
+        algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}`),
+        algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}/balances?currency-greater-than=0`),
+        new TokenRepository().getToken(ctx.params.assetId)
+    ])
 
     if (!assetResponse || assetResponse.status !== 200 || !offchainInfo) {
         throw new AssetNotFoundError()
@@ -199,6 +203,7 @@ router.get('/nfts/:assetId', async ctx => {
                 id: asset.index,
                 name: asset.params.name,
                 symbol: asset.params['unit-name'],
+                reserve: asset.params.reserve,
                 url: asset.params.url,
                 ...offchainInfo,
                 holders: balances

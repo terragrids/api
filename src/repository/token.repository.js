@@ -56,34 +56,42 @@ export default class TokenRepository extends DynamoDbRepository {
 
     async getToken(assetId) {
         try {
-            const data = await this.get({
+            const response = await this.get({
                 key: { pk: { S: `${this.pkTokenPrefix}|${assetId}` } },
                 itemLogName: this.itemName
             })
 
+            const item = response.Item
+
             let symbol
-            if (data.Item && data.Item.gsi1pk) {
-                symbol = data.Item.gsi1pk.S.replace('symbol|', '')
-            } else if (data.Item && data.Item.symbol) {
-                symbol = data.Item.symbol.S
+            if (item && item.gsi1pk) {
+                symbol = item.gsi1pk.S.replace('symbol|', '')
+            } else if (item && item.symbol) {
+                symbol = item.symbol.S
             } else {
                 symbol = null
             }
 
-            return data.Item && symbol
+            const data = item.data.S.split('|')
+            const status = data[2]
+            const date = data[3]
+
+            return item && symbol
                 ? {
                       id: assetId,
                       symbol,
-                      ...(data.Item.offchainUrl && data.Item.offchainUrl.S && { offchainUrl: data.Item.offchainUrl.S }),
-                      ...(data.Item.applicationId && data.Item.applicationId.S && { contractId: data.Item.applicationId.S }),
-                      ...(data.Item.contractInfo && data.Item.contractInfo.S && { contractInfo: data.Item.contractInfo.S }),
-                      ...(data.Item.sellerAddress && data.Item.sellerAddress.S && { sellerAddress: data.Item.sellerAddress.S }),
-                      ...(data.Item.assetPrice && data.Item.assetPrice.S && { assetPrice: data.Item.assetPrice.S }),
-                      ...(data.Item.assetPriceUnit && data.Item.assetPriceUnit.S && { assetPriceUnit: data.Item.assetPriceUnit.S }),
-                      ...(data.Item.verified && data.Item.applicationId && data.Item.applicationId.S && { verified: data.Item.verified.BOOL }),
-                      ...(data.Item.power && data.Item.power.N !== undefined && { power: parseInt(data.Item.power.N) }),
-                      ...(data.Item.positionX && data.Item.positionX.N !== undefined && { positionX: parseInt(data.Item.positionX.N) }),
-                      ...(data.Item.positionY && data.Item.positionY.N !== undefined && { positionY: parseInt(data.Item.positionY.N) })
+                      status,
+                      statusChanged: date,
+                      ...(item.offchainUrl && item.offchainUrl.S && { offchainUrl: item.offchainUrl.S }),
+                      ...(item.applicationId && item.applicationId.S && { contractId: item.applicationId.S }),
+                      ...(item.contractInfo && item.contractInfo.S && { contractInfo: item.contractInfo.S }),
+                      ...(item.sellerAddress && item.sellerAddress.S && { sellerAddress: item.sellerAddress.S }),
+                      ...(item.assetPrice && item.assetPrice.S && { assetPrice: item.assetPrice.S }),
+                      ...(item.assetPriceUnit && item.assetPriceUnit.S && { assetPriceUnit: item.assetPriceUnit.S }),
+                      ...(item.verified && item.applicationId && item.applicationId.S && { verified: item.verified.BOOL }),
+                      ...(item.power && item.power.N !== undefined && { power: parseInt(item.power.N) }),
+                      ...(item.positionX && item.positionX.N !== undefined && { positionX: parseInt(item.positionX.N) }),
+                      ...(item.positionY && item.positionY.N !== undefined && { positionY: parseInt(item.positionY.N) })
                   }
                 : null
         } catch (e) {

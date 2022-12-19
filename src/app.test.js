@@ -1056,7 +1056,7 @@ describe('app', function () {
     })
 
     describe('get nft endpoint', function () {
-        it('should return 200 when calling nft endpoint and assets found on both algo indexer and offchain db', async () => {
+        it('should return 200 when calling nft endpoint and assets found on both algo indexer and offchain db and no contract info', async () => {
             mockTokenRepository.getToken.mockImplementation(() =>
                 Promise.resolve({
                     id: 123,
@@ -1076,13 +1076,14 @@ describe('app', function () {
                                         name: 'Terracell #1',
                                         total: 1,
                                         decimals: 0,
+                                        reserve: 'reserve_address',
                                         'unit-name': 'TRCL',
                                         url: 'https://terragrids.org#1'
                                     }
                                 }
                             }
                         })
-                    case 'assets/123/balances':
+                    case 'assets/123/balances?currency-greater-than=0':
                         return Promise.resolve({
                             status: 200,
                             json: {
@@ -1117,7 +1118,10 @@ describe('app', function () {
 
             expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledTimes(2)
             expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/123')
-            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/123/balances')
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/123/balances?currency-greater-than=0')
+
+            expect(mockTokenRepository.getToken).toHaveBeenCalledTimes(1)
+            expect(mockTokenRepository.getToken).toHaveBeenCalledWith('123')
 
             expect(response.status).toBe(200)
             expect(response.body).toEqual({
@@ -1125,6 +1129,7 @@ describe('app', function () {
                     id: 123,
                     name: 'Terracell #1',
                     symbol: 'TRCL',
+                    reserve: 'reserve_address',
                     url: 'https://terragrids.org#1',
                     offchainUrl: 'offchain_url',
                     holders: [
@@ -1167,13 +1172,14 @@ describe('app', function () {
                                         name: 'Terracell #1',
                                         total: 1,
                                         decimals: 0,
+                                        reserve: 'reserve_address',
                                         'unit-name': 'TRCL',
                                         url: 'https://terragrids.org#1'
                                     }
                                 }
                             }
                         })
-                    case 'assets/123/balances':
+                    case 'assets/123/balances?currency-greater-than=0':
                         return Promise.resolve({
                             status: 200,
                             json: {
@@ -1208,7 +1214,7 @@ describe('app', function () {
 
             expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledTimes(2)
             expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/123')
-            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/123/balances')
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/123/balances?currency-greater-than=0')
 
             expect(response.status).toBe(200)
             expect(response.body).toEqual({
@@ -1217,6 +1223,7 @@ describe('app', function () {
                     name: 'Terracell #1',
                     symbol: 'TRCL',
                     url: 'https://terragrids.org#1',
+                    reserve: 'reserve_address',
                     offchainUrl: 'offchain_url',
                     contractId: 'contract-id',
                     contractInfo: 'contract-info',
