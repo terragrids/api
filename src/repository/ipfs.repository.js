@@ -42,26 +42,39 @@ export default class IpfsRepository {
                     file_url: fileName,
                     file_url_integrity: imageIntegrity,
                     file_url_mimetype: fileMimetype,
-                    base_price: {
-                        name: 'base price',
-                        value: assetProperties.price,
-                        display_value: `${assetProperties.price} ALGO`
-                    },
-                    rarity: {
-                        name: 'rarity',
-                        value: assetProperties.rarity,
-                        display_value: assetProperties.rarity
-                    },
-                    author: {
-                        name: 'author',
-                        value: assetProperties.author,
-                        display_value: assetProperties.author
-                    },
+                    ...(assetProperties['base_price'] && {
+                        base_price: {
+                            name: 'base price',
+                            value: assetProperties.price,
+                            display_value: `${assetProperties.price} ALGO`
+                        }
+                    }),
+                    ...(assetProperties.rarity && {
+                        rarity: {
+                            name: 'rarity',
+                            value: assetProperties.rarity,
+                            display_value: assetProperties.rarity
+                        }
+                    }),
+                    ...(assetProperties.author && {
+                        author: {
+                            name: 'author',
+                            value: assetProperties.author,
+                            display_value: assetProperties.author
+                        }
+                    }),
                     ...(assetProperties.power && {
                         power: {
                             name: 'power',
                             value: assetProperties.power,
                             display_value: `${assetProperties.power} TRW`
+                        }
+                    }),
+                    ...(assetProperties.budget && {
+                        budget: {
+                            name: 'budget',
+                            value: assetProperties.budget,
+                            display_value: `${assetProperties.budget} ALGO`
                         }
                     })
                 }
