@@ -42,7 +42,7 @@ export default class IpfsRepository {
                     file_url: fileName,
                     file_url_integrity: imageIntegrity,
                     file_url_mimetype: fileMimetype,
-                    ...(assetProperties['base_price'] && {
+                    ...(assetProperties.price && {
                         base_price: {
                             name: 'base price',
                             value: assetProperties.price,
