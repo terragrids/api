@@ -21,6 +21,7 @@ import { NftTypeError } from './error/nft-type.error.js'
 import DynamoDbRepository from './repository/dynamodb.repository.js'
 import authHandler from './middleware/auth-handler.js'
 import AuthRepository from './repository/auth.repository.js'
+import jwtAuthorize from './middleware/jwt-authorize.js'
 
 dotenv.config()
 export const app = new Koa()
@@ -38,6 +39,10 @@ router.get('/hc', async ctx => {
         ipfs: await new IpfsRepository().testConnection(),
         s3: await new S3Repository().testConnection()
     }
+})
+
+router.get('/user', jwtAuthorize, async ctx => {
+    ctx.body = { user: ctx.state.jwt }
 })
 
 router.get('/terracells', async ctx => {

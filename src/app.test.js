@@ -27,6 +27,13 @@ jest.mock('./middleware/auth-handler.js', () =>
     })
 )
 
+jest.mock('./middleware/jwt-authorize.js', () =>
+    jest.fn().mockImplementation(async (ctx, next) => {
+        ctx.state.jwt = 'jwt'
+        await next()
+    })
+)
+
 const mockAuthRepository = {
     getAuthMessage: jest.fn().mockImplementation(() => jest.fn())
 }
@@ -2901,6 +2908,14 @@ describe('app', function () {
         it('should return 201 when calling project endpoint', async () => {
             const response = await request(app.callback()).post('/project?')
             expect(response.status).toBe(201)
+        })
+    })
+
+    describe('get user', function () {
+        it('should return 201 when calling project endpoint', async () => {
+            const response = await request(app.callback()).get('/user')
+            expect(response.status).toBe(200)
+            expect(response.body).toEqual({ user: 'jwt' })
         })
     })
 
