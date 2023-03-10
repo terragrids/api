@@ -1,14 +1,14 @@
 import { ConditionalCheckFailedException } from '@aws-sdk/client-dynamodb'
 import AssetNotFoundError from '../error/asset-not-found.error.js'
-import { minutes10 } from '../utils/constants.js'
 import DynamoDbRepository from './dynamodb.repository.js'
 
 export default class JwtRepository extends DynamoDbRepository {
     async putJwks(jwks) {
+        const base64Jwks = Buffer.from(JSON.stringify(jwks)).toString('base64')
         return await this.put({
             item: {
                 pk: { S: 'jwks' },
-                jwks: { S: jwks },
+                jwks: { S: base64Jwks },
                 lastCached: { N: `${Date.now()}` }
             },
             itemLogName: 'jwks'
@@ -22,12 +22,9 @@ export default class JwtRepository extends DynamoDbRepository {
                 itemLogName: 'jwks'
             })
 
-            if (!response.Item) return null
-
             const item = response.Item
-            if (!item.lastCached || Date.now() > Number(item.lastCached.N) + minutes10) return null
-
-            return item.jwks.S
+            if (!item) return null
+            return JSON.parse(Buffer.from(item.jwks.S, 'base64').toString('ascii'))
         } catch (e) {
             if (e instanceof ConditionalCheckFailedException) throw new AssetNotFoundError()
             else throw e
