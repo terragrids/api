@@ -22,6 +22,7 @@ import DynamoDbRepository from './repository/dynamodb.repository.js'
 import authHandler from './middleware/auth-handler.js'
 import AuthRepository from './repository/auth.repository.js'
 import jwtAuthorize from './middleware/jwt-authorize.js'
+import UserRepository from './repository/user.repository.js'
 
 dotenv.config()
 export const app = new Koa()
@@ -42,7 +43,15 @@ router.get('/hc', async ctx => {
 })
 
 router.get('/user', jwtAuthorize, async ctx => {
-    ctx.body = { user: ctx.state.jwt }
+    const userRepository = new UserRepository()
+    let user = await userRepository.getUserById(ctx.state.jwt.sub)
+
+    if (!user) {
+        user = { id: ctx.state.jwt.sub }
+        await userRepository.putUser(user)
+    }
+
+    ctx.body = { ...user }
 })
 
 router.get('/terracells', async ctx => {
