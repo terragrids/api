@@ -27,7 +27,7 @@ export default class IpfsRepository {
         }
     }
 
-    async pinJson({ assetName, assetDescription, assetProperties, fileIpfsHash, fileName, fileMimetype, options = {} }) {
+    async pinJson({ assetName, assetDescription, assetProperties, fileIpfsHash, fileMimetype, options = {} }) {
         try {
             const fileIntegrity = this.convertIpfsCidV0ToByte32(fileIpfsHash)
             const imageIntegrity = `sha256-${fileIntegrity}`
@@ -39,9 +39,6 @@ export default class IpfsRepository {
                 image_integrity: imageIntegrity,
                 image_mimetype: fileMimetype,
                 properties: {
-                    file_url: fileName,
-                    file_url_integrity: imageIntegrity,
-                    file_url_mimetype: fileMimetype,
                     ...(assetProperties.price && {
                         base_price: {
                             name: 'base price',
@@ -75,6 +72,13 @@ export default class IpfsRepository {
                             name: 'budget',
                             value: assetProperties.budget,
                             display_value: `${assetProperties.budget} ALGO`
+                        }
+                    }),
+                    ...(assetProperties.placeType && {
+                        placeType: {
+                            name: 'place type',
+                            value: assetProperties.placeType.code,
+                            display_value: assetProperties.placeType.name
                         }
                     })
                 }

@@ -365,7 +365,7 @@ router.get('/accounts/:accountId/nfts/:symbol', async ctx => {
     ctx.body = { assets }
 })
 
-router.post('/ipfs/files', bodyparser(), async ctx => {
+router.post('/ipfs/files', jwtAuthorize, bodyparser(), async ctx => {
     if (!ctx.request.body.assetName) throw new MissingParameterError('assetName')
     if (!ctx.request.body.assetDescription) throw new MissingParameterError('assetDescription')
     if (!ctx.request.body.assetProperties) throw new MissingParameterError('assetProperties')
@@ -393,7 +393,7 @@ router.post('/ipfs/files', bodyparser(), async ctx => {
     ctx.status = 201
 })
 
-router.post('/files/upload', bodyparser(), async ctx => {
+router.post('/files/upload', jwtAuthorize, bodyparser(), async ctx => {
     if (!ctx.request.body.contentType) throw new MissingParameterError('contentType')
     const response = await new S3Repository().getUploadSignedUrl(ctx.request.body.contentType)
     ctx.body = {
