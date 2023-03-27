@@ -1,33 +1,58 @@
 import pinataSDK from '@pinata/sdk'
 import bs58 from 'bs58'
+import { FormData } from 'formdata-node'
+import fetch from 'node-fetch'
 import IpfsFilePinningError from '../error/ipfs-file-pinning-error.js'
 import IpfsJsonPinningError from '../error/ipfs-json-pinning-error.js'
+import BlobFromStream from '../utils/blob-from-stream.js'
 
 export default class IpfsRepository {
     pinata
 
     constructor() {
         this.pinata = pinataSDK(process.env.PINATA_IPFS_API_KEY, process.env.PINATA_IPFS_API_SECRET)
+        this.infuraApiUrl = 'https://ipfs.infura.io:5001/api/v0'
+        const credentials = `${process.env.INFURA_IPFS_API_KEY}:${process.env.INFURA_IPFS_API_SECRET}`
+        this.basicAuthorization = `Basic ${Buffer.from(credentials).toString('base64')}`
     }
 
     async testConnection() {
         try {
-            const response = await this.pinata.testAuthentication()
-            return response.authenticated === true ? true : false
+            const response = await fetch(`${this.infuraApiUrl}/version`, {
+                method: 'POST',
+                headers: { Authorization: this.basicAuthorization }
+            })
+            return response.status === 200
         } catch (e) {
             return { error: e }
         }
     }
 
-    async pinFile(fileStream, options = {}) {
+    async pinFile(fileStream, contentLength) {
         try {
-            return await this.pinata.pinFileToIPFS(fileStream, options)
+            // return await this.pinata.pinFileToIPFS(fileStream, options)
+            const formData = new FormData()
+            formData.set('strefileam', new BlobFromStream(fileStream, contentLength), 'file.txt')
+
+            const response = await fetch(`${this.infuraApiUrl}/add`, {
+                method: 'POST',
+                headers: {
+                    Authorization: this.basicAuthorization
+                },
+                body: formData
+            })
+
+            if (response.status === 200) {
+                const json = await response.json()
+                console.log(json)
+                return { hash: json.Hash }
+            } else throw new Error('Unable to upload file to IPFS')
         } catch (e) {
             throw new IpfsFilePinningError(e.message)
         }
     }
 
-    async pinJson({ assetName, assetDescription, assetProperties, fileIpfsHash, fileMimetype, options = {} }) {
+    async pinJson({ assetName, assetDescription, assetProperties, fileIpfsHash, fileMimetype }) {
         try {
             const fileIntegrity = this.convertIpfsCidV0ToByte32(fileIpfsHash)
             const imageIntegrity = `sha256-${fileIntegrity}`
@@ -84,14 +109,24 @@ export default class IpfsRepository {
                 }
             }
 
-            const result = await this.pinata.pinJSONToIPFS(metadata, options)
-            const jsonIntegrity = this.convertIpfsCidV0ToByte32(result.IpfsHash)
+            // const result = await this.pinata.pinJSONToIPFS(metadata, options)
 
-            return {
-                ...result,
-                assetName,
-                integrity: jsonIntegrity
-            }
+            const response = await fetch(`${this.infuraApiUrl}/add`, {
+                method: 'POST',
+                headers: { Authorization: this.basicAuthorization },
+                body: metadata
+            })
+
+            if (response.status === 200) {
+                const json = await response.json()
+                const integrity = this.convertIpfsCidV0ToByte32(json.Hash)
+
+                return {
+                    hash: json.Hash,
+                    assetName,
+                    integrity
+                }
+            } else throw new Error('Unable to upload file to IPFS')
         } catch (e) {
             throw new IpfsJsonPinningError(e.message)
         }

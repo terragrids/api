@@ -28,6 +28,8 @@
         "bs58": "^5.0.0",
         "crypto-random-string": "^5.0.0",
         "dotenv": "^16.0.3",
+        "form-data": "^4.0.0",
+        "formdata-node": "^5.0.0",
         "jsonwebtoken": "^9.0.0",
         "jwk-to-pem": "^2.0.5",
         "koa": "^2.14.1",
