@@ -67,13 +67,13 @@ jest.mock('./repository/token.repository.js', () =>
 )
 
 const mockUserRepository = {
-    getUserById: jest.fn().mockImplementation(() => jest.fn()),
-    putUser: jest.fn().mockImplementation(() => jest.fn())
+    getUserByOauthId: jest.fn().mockImplementation(() => jest.fn()),
+    addUser: jest.fn().mockImplementation(() => jest.fn())
 }
 jest.mock('./repository/user.repository.js', () =>
     jest.fn().mockImplementation(() => ({
-        getUserById: mockUserRepository.getUserById,
-        putUser: mockUserRepository.putUser
+        getUserByOauthId: mockUserRepository.getUserByOauthId,
+        addUser: mockUserRepository.addUser
     }))
 )
 
@@ -2924,7 +2924,7 @@ describe('app', function () {
 
     describe('get user', function () {
         it('should return 200 when calling user endpoint and user is in local db', async () => {
-            mockUserRepository.getUserById.mockImplementation(() =>
+            mockUserRepository.getUserByOauthId.mockImplementation(() =>
                 Promise.resolve({
                     id: 'user_id'
                 })
@@ -2932,26 +2932,27 @@ describe('app', function () {
 
             const response = await request(app.callback()).get('/user')
 
-            expect(mockUserRepository.getUserById).toHaveBeenCalledTimes(1)
-            expect(mockUserRepository.getUserById).toHaveBeenCalledWith('jwt_sub')
+            expect(mockUserRepository.getUserByOauthId).toHaveBeenCalledTimes(1)
+            expect(mockUserRepository.getUserByOauthId).toHaveBeenCalledWith('jwt_sub')
 
             expect(response.status).toBe(200)
             expect(response.body).toEqual({ id: 'user_id' })
         })
 
         it('should return 200 when calling user endpoint and user is not in local db', async () => {
-            mockUserRepository.getUserById.mockImplementation(() => Promise.resolve(null))
+            mockUserRepository.getUserByOauthId.mockImplementation(() => Promise.resolve(null))
+            mockUserRepository.addUser.mockImplementation(() => Promise.resolve({id: 'new_user_id'}))
 
             const response = await request(app.callback()).get('/user')
 
-            expect(mockUserRepository.getUserById).toHaveBeenCalledTimes(1)
-            expect(mockUserRepository.getUserById).toHaveBeenCalledWith('jwt_sub')
+            expect(mockUserRepository.getUserByOauthId).toHaveBeenCalledTimes(1)
+            expect(mockUserRepository.getUserByOauthId).toHaveBeenCalledWith('jwt_sub')
 
-            expect(mockUserRepository.putUser).toHaveBeenCalledTimes(1)
-            expect(mockUserRepository.putUser).toHaveBeenCalledWith({ id: 'jwt_sub' })
+            expect(mockUserRepository.addUser).toHaveBeenCalledTimes(1)
+            expect(mockUserRepository.addUser).toHaveBeenCalledWith({ oauthId: 'jwt_sub' })
 
             expect(response.status).toBe(200)
-            expect(response.body).toEqual({ id: 'jwt_sub' })
+            expect(response.body).toEqual({ id: 'new_user_id' })
         })
     })
 

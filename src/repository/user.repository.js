@@ -1,30 +1,34 @@
 import { ConditionalCheckFailedException } from '@aws-sdk/client-dynamodb'
 import AssetNotFoundError from '../error/asset-not-found.error.js'
+import uuid from '../utils/uuid.js'
 import DynamoDbRepository from './dynamodb.repository.js'
 
 export default class UserRepository extends DynamoDbRepository {
-    async putUser({ id, walletAddress }) {
-        return await this.put({
+    async addUser({ oauthId, walletAddress }) {
+        const userId = uuid()
+        await this.put({
             item: {
-                pk: { S: `user|${id}` },
-                ...(walletAddress && { gsi1pk: { S: `user|wallet|${walletAddress}` } }),
+                pk: { S: `user|oauth|${oauthId}` },
+                gsi1pk: { S: `user|id|${userId}` },
+                ...(walletAddress && { gsi2pk: { S: `user|wallet|${walletAddress}` } }),
                 lastModified: { N: `${Date.now()}` }
             },
             itemLogName: 'user'
         })
+        return { id: userId }
     }
 
-    async getUserById(id) {
+    async getUserByOauthId(id) {
         try {
             const response = await this.get({
-                key: { pk: { S: `user|${id}` } },
+                key: { pk: { S: `user|oauth|${id}` } },
                 itemLogName: 'user'
             })
 
             const item = response.Item
             return item
                 ? {
-                      id: item.pk.S.replace('user|', ''),
+                      id: item.gsi1pk.S.replace('user|id|', ''),
                       ...(item.walletAddress && { walletAddress: item.walletAddress.S })
                   }
                 : null

@@ -44,11 +44,10 @@ router.get('/hc', async ctx => {
 
 router.get('/user', jwtAuthorize, async ctx => {
     const userRepository = new UserRepository()
-    let user = await userRepository.getUserById(ctx.state.jwt.sub)
+    let user = await userRepository.getUserByOauthId(ctx.state.jwt.sub)
 
     if (!user) {
-        user = { id: ctx.state.jwt.sub }
-        await userRepository.putUser(user)
+        user = await userRepository.addUser({ oauthId: ctx.state.jwt.sub })
     }
 
     ctx.body = { ...user }
