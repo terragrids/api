@@ -6,12 +6,14 @@ import DynamoDbRepository from './dynamodb.repository.js'
 export default class UserRepository extends DynamoDbRepository {
     async addUser({ oauthId, walletAddress }) {
         const userId = uuid()
+        const now = Date.now()
         await this.put({
             item: {
                 pk: { S: `user|oauth|${oauthId}` },
                 gsi1pk: { S: `user|id|${userId}` },
                 ...(walletAddress && { gsi2pk: { S: `user|wallet|${walletAddress}` } }),
-                lastModified: { N: `${Date.now()}` }
+                data: { S: `user|created|${now}` },
+                lastModified: { N: `${now}` }
             },
             itemLogName: 'user'
         })
