@@ -374,19 +374,19 @@ router.post('/ipfs/files', jwtAuthorize, bodyparser(), async ctx => {
     const ipfs = new IpfsRepository()
 
     const s3Object = await s3.getFileReadStream(ctx.request.body.fileName)
-    const resultFile = await ipfs.pinFile(s3Object.fileStream)
+    const resultFile = await ipfs.pinFile(s3Object.fileStream, ctx.request.body.fileName, s3Object.contentLength)
     const resultMeta = await ipfs.pinJson({
         assetName: ctx.request.body.assetName,
         assetDescription: ctx.request.body.assetDescription,
         assetProperties: ctx.request.body.assetProperties,
-        fileIpfsHash: resultFile.IpfsHash,
+        fileIpfsHash: resultFile.hash,
         fileName: ctx.request.body.fileName,
         fileMimetype: s3Object.contentType
     })
 
     ctx.body = {
         assetName: resultMeta.assetName,
-        url: `ipfs://${resultMeta.IpfsHash}`,
+        url: `ipfs://${resultMeta.hash}`,
         integrity: resultMeta.integrity
     }
     ctx.status = 201

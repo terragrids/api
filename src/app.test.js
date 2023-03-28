@@ -2747,19 +2747,20 @@ describe('app', function () {
             mockS3Repository.getFileReadStream.mockImplementation(() => {
                 return Promise.resolve({
                     fileStream: 'fileStream',
-                    contentType: 'content/type'
+                    contentType: 'content/type',
+                    contentLength: 123
                 })
             })
 
             mockIpfsRepository.pinFile.mockImplementation(() => {
                 return Promise.resolve({
-                    IpfsHash: 'FileIpfsHash'
+                    hash: 'FileIpfsHash'
                 })
             })
 
             mockIpfsRepository.pinJson.mockImplementation(() => {
                 return Promise.resolve({
-                    IpfsHash: 'JsonIpfsHash',
+                    hash: 'JsonIpfsHash',
                     assetName: 'asset-name',
                     integrity: 'json-integrity'
                 })
@@ -2778,7 +2779,7 @@ describe('app', function () {
             expect(mockS3Repository.getFileReadStream).toHaveBeenCalledWith('filename')
 
             expect(mockIpfsRepository.pinFile).toHaveBeenCalledTimes(1)
-            expect(mockIpfsRepository.pinFile).toHaveBeenCalledWith('fileStream')
+            expect(mockIpfsRepository.pinFile).toHaveBeenCalledWith('fileStream', 'filename', 123)
 
             expect(mockIpfsRepository.pinJson).toHaveBeenCalledTimes(1)
             expect(mockIpfsRepository.pinJson).toHaveBeenCalledWith({
@@ -2941,7 +2942,7 @@ describe('app', function () {
 
         it('should return 200 when calling user endpoint and user is not in local db', async () => {
             mockUserRepository.getUserByOauthId.mockImplementation(() => Promise.resolve(null))
-            mockUserRepository.addUser.mockImplementation(() => Promise.resolve({id: 'new_user_id'}))
+            mockUserRepository.addUser.mockImplementation(() => Promise.resolve({ id: 'new_user_id' }))
 
             const response = await request(app.callback()).get('/user')
 
