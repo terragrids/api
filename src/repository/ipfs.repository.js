@@ -1,9 +1,8 @@
 import bs58 from 'bs58'
-import { Blob, FormData } from 'formdata-node'
+import FormData from 'form-data'
 import fetch from 'node-fetch'
 import IpfsFilePinningError from '../error/ipfs-file-pinning-error.js'
 import IpfsJsonPinningError from '../error/ipfs-json-pinning-error.js'
-import BlobFromStream from '../utils/blob-from-stream.js'
 
 export default class IpfsRepository {
     constructor() {
@@ -24,10 +23,12 @@ export default class IpfsRepository {
         }
     }
 
-    async pinFile(stream, name, length) {
+    async pinFile(stream, name /*length*/) {
         try {
             const formData = new FormData()
-            formData.set('file', new BlobFromStream(stream, length), name)
+            // TODO: reintroduce formdata-node when this has been fixed https://github.com/node-fetch/node-fetch/issues/1718
+            // formData.set('file', new BlobFromStream(stream, length), name)
+            formData.append('file', stream, name)
 
             const response = await fetch(`${this.infuraApiUrl}/add`, {
                 method: 'POST',
@@ -102,8 +103,9 @@ export default class IpfsRepository {
             }
 
             const formData = new FormData()
-            const blob = new Blob([JSON.stringify(metadata)], { type: 'application/json' })
-            formData.set('metadata', blob)
+            // TODO: reintroduce formdata-node when this has been fixed https://github.com/node-fetch/node-fetch/issues/1718
+            // const blob = new Blob([JSON.stringify(metadata)], { type: 'application/json' })
+            formData.append('metadata', JSON.stringify(metadata))
 
             const response = await fetch(`${this.infuraApiUrl}/add`, {
                 method: 'POST',
