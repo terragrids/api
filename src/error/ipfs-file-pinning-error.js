@@ -2,18 +2,18 @@ import GenericError from './generic-error.js'
 
 export default class IpfsFilePinningError extends GenericError {
     httpCode = 500
-    message
+    error
 
-    constructor(message) {
+    constructor(error) {
         super()
-        this.message = message
+        this.error = error
     }
 
     toJson() {
         return {
             error: 'IpfsFilePinningError',
             message: 'Error pinning file to IPFS',
-            ...process.env.ENV !== 'prod' && { info: this.error.message }
+            ...(process.env.ENV !== 'prod' && { info: this.error.message })
         }
     }
 }
