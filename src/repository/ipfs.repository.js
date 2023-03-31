@@ -40,7 +40,7 @@ export default class IpfsRepository {
                 return { hash: json.Hash }
             } else throw new Error('Unable to upload file to IPFS')
         } catch (e) {
-            throw new IpfsFilePinningError(e.message)
+            throw new IpfsFilePinningError(e)
         }
     }
 
@@ -122,7 +122,7 @@ export default class IpfsRepository {
                 }
             } else throw new Error('Unable to upload file to IPFS')
         } catch (e) {
-            throw new IpfsJsonPinningError(e.message)
+            throw new IpfsJsonPinningError(e)
         }
     }
 
