@@ -10,7 +10,7 @@ export default class S3KeyNotFoundError extends GenericError {
     toJson() {
         return {
             error: 'S3KeyNotFoundError',
-            message: 'The secified key was not found'
+            message: 'The specified key was not found'
         }
     }
 }
