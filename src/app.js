@@ -23,6 +23,7 @@ import authHandler from './middleware/auth-handler.js'
 import AuthRepository from './repository/auth.repository.js'
 import jwtAuthorize from './middleware/jwt-authorize.js'
 import UserRepository from './repository/user.repository.js'
+import MediaRepository from './repository/media.repository.js'
 
 dotenv.config()
 export const app = new Koa()
@@ -364,23 +365,41 @@ router.get('/accounts/:accountId/nfts/:symbol', async ctx => {
     ctx.body = { assets }
 })
 
+/**
+ * Uploads files to S3
+ */
+router.post('/files/upload', jwtAuthorize, bodyparser(), async ctx => {
+    if (!ctx.request.body.contentType) throw new MissingParameterError('contentType')
+    await new UserRepository().getUserByOauthId(ctx.state.jwt.sub)
+    const response = await new S3Repository().getUploadSignedUrl(ctx.request.body.contentType)
+    ctx.body = {
+        id: response.id,
+        url: response.url
+    }
+    ctx.status = 201
+})
+
+/**
+ * Transfers files from S3 to IPFS and pins files and metadata
+ */
 router.post('/ipfs/files', jwtAuthorize, bodyparser(), async ctx => {
     if (!ctx.request.body.assetName) throw new MissingParameterError('assetName')
     if (!ctx.request.body.assetDescription) throw new MissingParameterError('assetDescription')
     if (!ctx.request.body.assetProperties) throw new MissingParameterError('assetProperties')
-    if (!ctx.request.body.fileName) throw new MissingParameterError('fileName')
+    if (!ctx.request.body.fileId) throw new MissingParameterError('fileId')
 
+    await new UserRepository().getUserByOauthId(ctx.state.jwt.sub)
     const s3 = new S3Repository()
     const ipfs = new IpfsRepository()
 
-    const s3Object = await s3.getFileReadStream(ctx.request.body.fileName)
-    const resultFile = await ipfs.pinFile(s3Object.fileStream, ctx.request.body.fileName, s3Object.contentLength)
+    const s3Object = await s3.getFileReadStream(ctx.request.body.fileId)
+    const resultFile = await ipfs.pinFile(s3Object.fileStream, ctx.request.body.fileId, s3Object.contentLength)
     const resultMeta = await ipfs.pinJson({
         assetName: ctx.request.body.assetName,
         assetDescription: ctx.request.body.assetDescription,
         assetProperties: ctx.request.body.assetProperties,
         fileIpfsHash: resultFile.hash,
-        fileName: ctx.request.body.fileName,
+        fileName: ctx.request.body.fileId,
         fileMimetype: s3Object.contentType
     })
 
@@ -392,12 +411,32 @@ router.post('/ipfs/files', jwtAuthorize, bodyparser(), async ctx => {
     ctx.status = 201
 })
 
-router.post('/files/upload', jwtAuthorize, bodyparser(), async ctx => {
-    if (!ctx.request.body.contentType) throw new MissingParameterError('contentType')
-    const response = await new S3Repository().getUploadSignedUrl(ctx.request.body.contentType)
+/**
+ * Pins new metadata files to IPFS referring to pre-loaded media files on S3 and IPFS
+ */
+router.post('/ipfs/metadata', jwtAuthorize, bodyparser(), async ctx => {
+    if (!ctx.request.body.assetName) throw new MissingParameterError('assetName')
+    if (!ctx.request.body.assetDescription) throw new MissingParameterError('assetDescription')
+    if (!ctx.request.body.assetProperties) throw new MissingParameterError('assetProperties')
+    if (!ctx.request.body.fileId) throw new MissingParameterError('fileId')
+
+    await new UserRepository().getUserByOauthId(ctx.state.jwt.sub)
+
+    const s3Object = await new S3Repository().getFileMetadata(ctx.request.body.fileId)
+    const fileIpfsHash = new MediaRepository().getIpfsHashByFileId(ctx.request.body.fileId)
+    const resultMeta = await new IpfsRepository().pinJson({
+        assetName: ctx.request.body.assetName,
+        assetDescription: ctx.request.body.assetDescription,
+        assetProperties: ctx.request.body.assetProperties,
+        fileIpfsHash,
+        fileName: ctx.request.body.fileId,
+        fileMimetype: s3Object.contentType
+    })
+
     ctx.body = {
-        id: response.id,
-        url: response.url
+        assetName: resultMeta.assetName,
+        url: `ipfs://${resultMeta.hash}`,
+        integrity: resultMeta.integrity
     }
     ctx.status = 201
 })

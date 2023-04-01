@@ -1,5 +1,5 @@
 import { ConditionalCheckFailedException } from '@aws-sdk/client-dynamodb'
-import AssetNotFoundError from '../error/asset-not-found.error.js'
+import UserNotFoundError from '../error/user-not-found.error.js'
 import uuid from '../utils/uuid.js'
 import DynamoDbRepository from './dynamodb.repository.js'
 
@@ -28,14 +28,14 @@ export default class UserRepository extends DynamoDbRepository {
             })
 
             const item = response.Item
-            return item
-                ? {
-                      id: item.gsi1pk.S.replace('user|id|', ''),
-                      ...(item.walletAddress && { walletAddress: item.walletAddress.S })
-                  }
-                : null
+            if (item)
+                return {
+                    id: item.gsi1pk.S.replace('user|id|', ''),
+                    ...(item.walletAddress && { walletAddress: item.walletAddress.S })
+                }
+            else throw new UserNotFoundError()
         } catch (e) {
-            if (e instanceof ConditionalCheckFailedException) throw new AssetNotFoundError()
+            if (e instanceof ConditionalCheckFailedException) throw new UserNotFoundError()
             else throw e
         }
     }

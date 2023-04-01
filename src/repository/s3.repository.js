@@ -1,4 +1,4 @@
-import { GetObjectCommand, HeadBucketCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import { GetObjectCommand, HeadBucketCommand, HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import S3KeyNotFoundError from '../error/s3-key-not-found-error.js'
 import S3ReadError from '../error/s3-read-error.js'
@@ -51,6 +51,31 @@ export default class S3Repository {
         }
     }
 
+    async getFileMetadata(fileName) {
+        const command = new HeadObjectCommand({
+            Bucket: this.bucket,
+            Key: fileName
+        })
+
+        try {
+            const response = await this.s3.send(command)
+            if (response.$metadata.httpStatusCode === 200) {
+                return {
+                    contentType: response.ContentType,
+                    contentLength: response.ContentLength
+                }
+            } else {
+                throw new S3ReadError()
+            }
+        } catch (e) {
+            if (e.$metadata.httpStatusCode === 404) {
+                throw new S3KeyNotFoundError()
+            } else {
+                throw new S3ReadError()
+            }
+        }
+    }
+
     async getUploadSignedUrl(contentType) {
         const imageId = uuid()
 
@@ -58,7 +83,7 @@ export default class S3Repository {
             Bucket: this.bucket,
             Key: imageId,
             ContentType: contentType,
-            CacheControl: 'max-age=7776000',  // instructs CloudFront to cache for 90 days
+            CacheControl: 'max-age=7776000', // instructs CloudFront to cache for 90 days
             ACL: 'private',
             Metadata: {
                 imageId

@@ -1,5 +1,6 @@
 import { app } from './app.js'
 import request from 'supertest'
+import UserNotFoundError from './error/user-not-found.error.js'
 
 const mockAlgoIndexer = {
     callRandLabsIndexerEndpoint: jest.fn().mockImplementation(() => jest.fn()),
@@ -93,13 +94,24 @@ jest.mock('./repository/ipfs.repository.js', () =>
 const mockS3Repository = {
     testConnection: jest.fn().mockImplementation(() => jest.fn()),
     getFileReadStream: jest.fn().mockImplementation(() => jest.fn()),
+    getFileMetadata: jest.fn().mockImplementation(() => jest.fn()),
     getUploadSignedUrl: jest.fn().mockImplementation(() => jest.fn())
 }
 jest.mock('./repository/s3.repository.js', () =>
     jest.fn().mockImplementation(() => ({
         testConnection: mockS3Repository.testConnection,
         getFileReadStream: mockS3Repository.getFileReadStream,
+        getFileMetadata: mockS3Repository.getFileMetadata,
         getUploadSignedUrl: mockS3Repository.getUploadSignedUrl
+    }))
+)
+
+const mockMediaRepository = {
+    getIpfsHashByFileId: jest.fn().mockImplementation(() => jest.fn())
+}
+jest.mock('./repository/media.repository.js', () =>
+    jest.fn().mockImplementation(() => ({
+        getIpfsHashByFileId: mockMediaRepository.getIpfsHashByFileId
     }))
 )
 
@@ -2741,9 +2753,13 @@ describe('app', function () {
     })
 
     describe('post ipfs files endpoint', function () {
-        it('should return 201 when calling ipfs files endpoint and s3 file is found', async () => {
-            process.env.ALGO_APP_APPROVAL = 'approval_program_value'
+        beforeEach(() => {
+            mockUserRepository.getUserByOauthId.mockImplementation(() => ({
+                userId: 'user-id'
+            }))
+        })
 
+        it('should return 201 when calling ipfs files endpoint and s3 file is found', async () => {
             mockS3Repository.getFileReadStream.mockImplementation(() => {
                 return Promise.resolve({
                     fileStream: 'fileStream',
@@ -2772,14 +2788,14 @@ describe('app', function () {
                     assetName: 'asset name',
                     assetDescription: 'asset description',
                     assetProperties: { property: 'property' },
-                    fileName: 'filename'
+                    fileId: 'fileId'
                 })
 
             expect(mockS3Repository.getFileReadStream).toHaveBeenCalledTimes(1)
-            expect(mockS3Repository.getFileReadStream).toHaveBeenCalledWith('filename')
+            expect(mockS3Repository.getFileReadStream).toHaveBeenCalledWith('fileId')
 
             expect(mockIpfsRepository.pinFile).toHaveBeenCalledTimes(1)
-            expect(mockIpfsRepository.pinFile).toHaveBeenCalledWith('fileStream', 'filename', 123)
+            expect(mockIpfsRepository.pinFile).toHaveBeenCalledWith('fileStream', 'fileId', 123)
 
             expect(mockIpfsRepository.pinJson).toHaveBeenCalledTimes(1)
             expect(mockIpfsRepository.pinJson).toHaveBeenCalledWith({
@@ -2787,7 +2803,7 @@ describe('app', function () {
                 assetDescription: 'asset description',
                 assetProperties: { property: 'property' },
                 fileIpfsHash: 'FileIpfsHash',
-                fileName: 'filename',
+                fileName: 'fileId',
                 fileMimetype: 'content/type'
             })
 
@@ -2804,7 +2820,7 @@ describe('app', function () {
                 .post('/ipfs/files')
                 .send({
                     assetDescription: 'asset description',
-                    fileName: 'filename',
+                    fileId: 'fileId',
                     assetProperties: { properties: 'properties' }
                 })
 
@@ -2824,7 +2840,7 @@ describe('app', function () {
                 .post('/ipfs/files')
                 .send({
                     assetName: 'asset name',
-                    fileName: 'filename',
+                    fileId: 'fileId',
                     assetProperties: { properties: 'properties' }
                 })
 
@@ -2843,7 +2859,7 @@ describe('app', function () {
             const response = await request(app.callback()).post('/ipfs/files').send({
                 assetName: 'asset name',
                 assetDescription: 'asset description',
-                fileName: 'filename'
+                fileId: 'fileId'
             })
 
             expect(mockS3Repository.getFileReadStream).not.toHaveBeenCalled()
@@ -2857,7 +2873,7 @@ describe('app', function () {
             })
         })
 
-        it('should return 400 when calling ipfs files endpoint and file name missing', async () => {
+        it('should return 400 when calling ipfs files endpoint and file id missing', async () => {
             const response = await request(app.callback())
                 .post('/ipfs/files')
                 .send({
@@ -2873,15 +2889,178 @@ describe('app', function () {
             expect(response.status).toBe(400)
             expect(response.body).toEqual({
                 error: 'MissingParameterError',
-                message: 'fileName must be specified'
+                message: 'fileId must be specified'
+            })
+        })
+
+        it('should return 404 when calling ipfs files endpoint and user not found', async () => {
+            mockUserRepository.getUserByOauthId.mockImplementation(() => {
+                throw new UserNotFoundError()
+            })
+
+            const response = await request(app.callback())
+                .post('/ipfs/files')
+                .send({
+                    assetName: 'asset name',
+                    assetDescription: 'asset description',
+                    assetProperties: { property: 'property' },
+                    fileId: 'fileId'
+                })
+
+            expect(mockS3Repository.getFileReadStream).not.toHaveBeenCalled()
+            expect(mockIpfsRepository.pinFile).not.toHaveBeenCalled()
+            expect(mockIpfsRepository.pinJson).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(404)
+            expect(response.body).toEqual({
+                error: 'UserNotFoundError',
+                message: 'User specified not found'
+            })
+        })
+    })
+
+    describe('post ipfs metadata endpoint', function () {
+        beforeEach(() => {
+            mockUserRepository.getUserByOauthId.mockImplementation(() => ({
+                userId: 'user-id'
+            }))
+
+            mockMediaRepository.getIpfsHashByFileId.mockImplementation(() => 'ipfs_file_hash')
+        })
+
+        it('should return 201 when calling ipfs metadata endpoint and s3 file is found', async () => {
+            mockS3Repository.getFileMetadata.mockImplementation(() => {
+                return Promise.resolve({
+                    contentType: 'content/type',
+                    contentLength: 123
+                })
+            })
+
+            mockIpfsRepository.pinJson.mockImplementation(() => {
+                return Promise.resolve({
+                    hash: 'ipfs_metadata_hash',
+                    assetName: 'asset-name',
+                    integrity: 'json-integrity'
+                })
+            })
+
+            const response = await request(app.callback())
+                .post('/ipfs/metadata')
+                .send({
+                    assetName: 'asset name',
+                    assetDescription: 'asset description',
+                    assetProperties: { property: 'property' },
+                    fileId: 'fileId'
+                })
+
+            expect(mockS3Repository.getFileMetadata).toHaveBeenCalledTimes(1)
+            expect(mockS3Repository.getFileMetadata).toHaveBeenCalledWith('fileId')
+
+            expect(mockIpfsRepository.pinJson).toHaveBeenCalledTimes(1)
+            expect(mockIpfsRepository.pinJson).toHaveBeenCalledWith({
+                assetName: 'asset name',
+                assetDescription: 'asset description',
+                assetProperties: { property: 'property' },
+                fileIpfsHash: 'ipfs_file_hash',
+                fileName: 'fileId',
+                fileMimetype: 'content/type'
+            })
+
+            expect(response.status).toBe(201)
+            expect(response.body).toEqual({
+                assetName: 'asset-name',
+                url: 'ipfs://ipfs_metadata_hash',
+                integrity: 'json-integrity'
+            })
+        })
+
+        it('should return 400 when calling ipfs metadata endpoint and file id missing', async () => {
+            const response = await request(app.callback())
+                .post('/ipfs/metadata')
+                .send({
+                    assetName: 'asset name',
+                    assetDescription: 'asset description',
+                    assetProperties: { property: 'property' }
+                })
+
+            expect(mockS3Repository.getFileMetadata).not.toHaveBeenCalled()
+            expect(mockMediaRepository.getIpfsHashByFileId).not.toHaveBeenCalled()
+            expect(mockIpfsRepository.pinJson).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(400)
+            expect(response.body).toEqual({
+                error: 'MissingParameterError',
+                message: 'fileId must be specified'
+            })
+        })
+
+        it('should return 400 when calling ipfs metadata endpoint and asset name missing', async () => {
+            const response = await request(app.callback())
+                .post('/ipfs/metadata')
+                .send({
+                    fileId: 'fileId',
+                    assetDescription: 'asset description',
+                    assetProperties: { property: 'property' }
+                })
+
+            expect(mockS3Repository.getFileMetadata).not.toHaveBeenCalled()
+            expect(mockMediaRepository.getIpfsHashByFileId).not.toHaveBeenCalled()
+            expect(mockIpfsRepository.pinJson).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(400)
+            expect(response.body).toEqual({
+                error: 'MissingParameterError',
+                message: 'assetName must be specified'
+            })
+        })
+
+        it('should return 400 when calling ipfs metadata endpoint and asset description missing', async () => {
+            const response = await request(app.callback())
+                .post('/ipfs/metadata')
+                .send({
+                    fileId: 'fileId',
+                    assetName: 'asset name',
+                    assetProperties: { property: 'property' }
+                })
+
+            expect(mockS3Repository.getFileMetadata).not.toHaveBeenCalled()
+            expect(mockMediaRepository.getIpfsHashByFileId).not.toHaveBeenCalled()
+            expect(mockIpfsRepository.pinJson).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(400)
+            expect(response.body).toEqual({
+                error: 'MissingParameterError',
+                message: 'assetDescription must be specified'
+            })
+        })
+
+        it('should return 400 when calling ipfs metadata endpoint and asset properties missing', async () => {
+            const response = await request(app.callback()).post('/ipfs/metadata').send({
+                fileId: 'fileId',
+                assetName: 'asset name',
+                assetDescription: 'asset description'
+            })
+
+            expect(mockS3Repository.getFileMetadata).not.toHaveBeenCalled()
+            expect(mockMediaRepository.getIpfsHashByFileId).not.toHaveBeenCalled()
+            expect(mockIpfsRepository.pinJson).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(400)
+            expect(response.body).toEqual({
+                error: 'MissingParameterError',
+                message: 'assetProperties must be specified'
             })
         })
     })
 
     describe('post files upload endpoint', function () {
-        it('should return 201 when calling files upload endpoint', async () => {
-            process.env.ALGO_APP_APPROVAL = 'approval_program_value'
+        beforeEach(() => {
+            mockUserRepository.getUserByOauthId.mockImplementation(() => ({
+                userId: 'user-id'
+            }))
+        })
 
+        it('should return 201 when calling files upload endpoint', async () => {
             mockS3Repository.getUploadSignedUrl.mockImplementation(() => {
                 return Promise.resolve({
                     id: 'id',
@@ -2912,6 +3091,24 @@ describe('app', function () {
             expect(response.body).toEqual({
                 error: 'MissingParameterError',
                 message: 'contentType must be specified'
+            })
+        })
+
+        it('should return 404 when calling files upload endpoint and user not found', async () => {
+            mockUserRepository.getUserByOauthId.mockImplementation(() => {
+                throw new UserNotFoundError()
+            })
+
+            const response = await request(app.callback()).post('/files/upload').send({
+                contentType: 'content/type'
+            })
+
+            expect(mockS3Repository.getUploadSignedUrl).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(404)
+            expect(response.body).toEqual({
+                error: 'UserNotFoundError',
+                message: 'User specified not found'
             })
         })
     })
