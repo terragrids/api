@@ -24,6 +24,7 @@ import AuthRepository from './repository/auth.repository.js'
 import jwtAuthorize from './middleware/jwt-authorize.js'
 import UserRepository from './repository/user.repository.js'
 import MediaRepository from './repository/media.repository.js'
+import FileIdNotFoundError from './error/fileid-not-found-error copy.js'
 
 dotenv.config()
 export const app = new Koa()
@@ -420,10 +421,11 @@ router.post('/ipfs/metadata', jwtAuthorize, bodyparser(), async ctx => {
     if (!ctx.request.body.assetProperties) throw new MissingParameterError('assetProperties')
     if (!ctx.request.body.fileId) throw new MissingParameterError('fileId')
 
-    await new UserRepository().getUserByOauthId(ctx.state.jwt.sub)
-
-    const s3Object = await new S3Repository().getFileMetadata(ctx.request.body.fileId)
     const fileIpfsHash = new MediaRepository().getIpfsHashByFileId(ctx.request.body.fileId)
+    if (!fileIpfsHash) throw new FileIdNotFoundError()
+
+    const [, s3Object] = await Promise.all([new UserRepository().getUserByOauthId(ctx.state.jwt.sub), new S3Repository().getFileMetadata(ctx.request.body.fileId)])
+
     const resultMeta = await new IpfsRepository().pinJson({
         assetName: ctx.request.body.assetName,
         assetDescription: ctx.request.body.assetDescription,
@@ -441,9 +443,10 @@ router.post('/ipfs/metadata', jwtAuthorize, bodyparser(), async ctx => {
     ctx.status = 201
 })
 
-router.post('/project', authHandler, async ctx => {
-    //..
-    ctx.status = 201
+router.get('/media', async ctx => {
+    const media = new MediaRepository().getMediaFileIds()
+    ctx.body = { media }
+    ctx.status = 200
 })
 
 router.get('/auth', async ctx => {

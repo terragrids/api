@@ -107,10 +107,12 @@ jest.mock('./repository/s3.repository.js', () =>
 )
 
 const mockMediaRepository = {
+    getMediaFileIds: jest.fn().mockImplementation(() => jest.fn()),
     getIpfsHashByFileId: jest.fn().mockImplementation(() => jest.fn())
 }
 jest.mock('./repository/media.repository.js', () =>
     jest.fn().mockImplementation(() => ({
+        getMediaFileIds: mockMediaRepository.getMediaFileIds,
         getIpfsHashByFileId: mockMediaRepository.getIpfsHashByFileId
     }))
 )
@@ -3034,7 +3036,7 @@ describe('app', function () {
             })
         })
 
-        it('should return 400 when calling ipfs metadata endpoint and asset properties missing', async () => {
+        it('should return 404 when calling ipfs metadata endpoint and asset properties missing', async () => {
             const response = await request(app.callback()).post('/ipfs/metadata').send({
                 fileId: 'fileId',
                 assetName: 'asset name',
@@ -3049,6 +3051,62 @@ describe('app', function () {
             expect(response.body).toEqual({
                 error: 'MissingParameterError',
                 message: 'assetProperties must be specified'
+            })
+        })
+
+        it('should return 400 when calling ipfs metadata endpoint and file id not found', async () => {
+            mockMediaRepository.getIpfsHashByFileId.mockImplementation(() => null)
+
+            const response = await request(app.callback())
+                .post('/ipfs/metadata')
+                .send({
+                    fileId: 'fileId',
+                    assetName: 'asset name',
+                    assetDescription: 'asset description',
+                    assetProperties: { property: 'property' }
+                })
+
+            expect(mockMediaRepository.getIpfsHashByFileId).toHaveBeenCalledTimes(1)
+            expect(mockMediaRepository.getIpfsHashByFileId).toHaveBeenCalledWith('fileId')
+
+            expect(mockUserRepository.getUserByOauthId).not.toHaveBeenCalled()
+            expect(mockS3Repository.getFileMetadata).not.toHaveBeenCalled()
+            expect(mockIpfsRepository.pinJson).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(404)
+            expect(response.body).toEqual({
+                error: 'FileIdNotFoundError',
+                message: 'The specified file id was not found'
+            })
+        })
+
+        it('should return 404 when calling ipfs metadata endpoint and user not found', async () => {
+            mockUserRepository.getUserByOauthId.mockImplementation(() => {
+                throw new UserNotFoundError()
+            })
+
+            const response = await request(app.callback())
+                .post('/ipfs/metadata')
+                .send({
+                    fileId: 'fileId',
+                    assetName: 'asset name',
+                    assetDescription: 'asset description',
+                    assetProperties: { property: 'property' }
+                })
+
+            expect(mockMediaRepository.getIpfsHashByFileId).toHaveBeenCalledTimes(1)
+            expect(mockMediaRepository.getIpfsHashByFileId).toHaveBeenCalledWith('fileId')
+
+            expect(mockUserRepository.getUserByOauthId).toHaveBeenCalledTimes(1)
+            expect(mockUserRepository.getUserByOauthId).toHaveBeenCalledWith('jwt_sub')
+
+            expect(mockS3Repository.getFileMetadata).not.toHaveBeenCalled()
+            expect(mockIpfsRepository.pinJson).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(404)
+            expect(response.body).toEqual({
+                error: 'UserNotFoundError',
+                message: 'User specified not found'
             })
         })
     })
@@ -3113,10 +3171,15 @@ describe('app', function () {
         })
     })
 
-    describe('post project', function () {
-        it('should return 201 when calling project endpoint', async () => {
-            const response = await request(app.callback()).post('/project?')
-            expect(response.status).toBe(201)
+    describe('get media', function () {
+        it('should return 200 when calling media endpoint', async () => {
+            mockMediaRepository.getMediaFileIds.mockImplementation(() => [{ media: 'media' }])
+            const response = await request(app.callback()).get('/media')
+
+            expect(response.status).toBe(200)
+            expect(response.body).toEqual({
+                media: [{ media: 'media' }]
+            })
         })
     })
 
