@@ -1,24 +1,50 @@
-export default class MediaRepository {
-    getMedia() {
-        return [
-            {
-                key: 'detachedHouse1',
-                fileId: '89e12a92-b568-4511-9ce2-bb5a55791a7c',
-                ipfsHash: 'QmXVCRBkH9zp8Xhw95ZrwNMUMPSM4mmyUi7hfx9XbGXPXJ'
+import { ConditionalCheckFailedException } from '@aws-sdk/client-dynamodb'
+import AssetNotFoundError from '../error/asset-not-found.error.js'
+import DynamoDbRepository from './dynamodb.repository.js'
+
+export default class MediaRepository extends DynamoDbRepository {
+    async getMediaByType({ type, withHash = false, pageSize, nextPageKey, sort }) {
+        const forward = sort && sort === 'desc' ? false : true
+        const data = await this.query({
+            indexName: 'gsi1',
+            conditionExpression: 'gsi1pk = :gsi1pk',
+            attributeValues: {
+                ':gsi1pk': { S: `type|${type}` }
             },
-            {
-                key: 'detachedHouse3',
-                fileId: '1cbeb62a-935d-434e-875d-f17c9f5a2d4c',
-                ipfsHash: 'QmP9Jxm4xxuKZyUxfftBESy2V8EZAHWEu4P6m6sPoyoGzf'
+            pageSize,
+            nextPageKey,
+            forward,
+            itemLogName: 'media'
+        })
+
+        return {
+            media: data.items.map(asset => ({
+                id: asset.pk.S.replace('fileId|', ''),
+                key: asset.data.S.replace('media|', ''),
+                ...(withHash && { hash: asset.hash.S })
+            })),
+            ...(data.nextPageKey && { nextPageKey: data.nextPageKey })
+        }
+    }
+
+    async getMediaItem(fileId) {
+        try {
+            const response = await this.get({
+                key: { pk: { S: `fileId|${fileId}` } },
+                itemLogName: 'media'
+            })
+
+            const item = response.Item
+            if (!item) throw new AssetNotFoundError()
+
+            return {
+                id: item.pk.S.replace('fileId|', ''),
+                key: item.data.S.replace('media|', ''),
+                hash: item.hash.S
             }
-        ]
-    }
-
-    getMediaFileIds() {
-        return this.getMedia().map(item => ({ key: item.key, fileId: item.fileId }))
-    }
-
-    getIpfsHashByFileId(fileId) {
-        return this.getMedia().find(item => item.fileId === fileId)
+        } catch (e) {
+            if (e instanceof ConditionalCheckFailedException) throw new AssetNotFoundError()
+            else throw e
+        }
     }
 }

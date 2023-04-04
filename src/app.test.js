@@ -1,6 +1,8 @@
 import { app } from './app.js'
 import request from 'supertest'
 import UserNotFoundError from './error/user-not-found.error.js'
+import AssetNotFoundError from './error/asset-not-found.error.js'
+import S3KeyNotFoundError from './error/s3-key-not-found-error.js'
 
 const mockAlgoIndexer = {
     callRandLabsIndexerEndpoint: jest.fn().mockImplementation(() => jest.fn()),
@@ -107,13 +109,13 @@ jest.mock('./repository/s3.repository.js', () =>
 )
 
 const mockMediaRepository = {
-    getMediaFileIds: jest.fn().mockImplementation(() => jest.fn()),
-    getIpfsHashByFileId: jest.fn().mockImplementation(() => jest.fn())
+    getMediaByType: jest.fn().mockImplementation(() => jest.fn()),
+    getMediaItem: jest.fn().mockImplementation(() => jest.fn())
 }
 jest.mock('./repository/media.repository.js', () =>
     jest.fn().mockImplementation(() => ({
-        getMediaFileIds: mockMediaRepository.getMediaFileIds,
-        getIpfsHashByFileId: mockMediaRepository.getIpfsHashByFileId
+        getMediaByType: mockMediaRepository.getMediaByType,
+        getMediaItem: mockMediaRepository.getMediaItem
     }))
 )
 
@@ -2926,8 +2928,6 @@ describe('app', function () {
             mockUserRepository.getUserByOauthId.mockImplementation(() => ({
                 userId: 'user-id'
             }))
-
-            mockMediaRepository.getIpfsHashByFileId.mockImplementation(() => 'ipfs_file_hash')
         })
 
         it('should return 201 when calling ipfs metadata endpoint and s3 file is found', async () => {
@@ -2937,6 +2937,12 @@ describe('app', function () {
                     contentLength: 123
                 })
             })
+
+            mockMediaRepository.getMediaItem.mockImplementation(() => ({
+                id: 'file-id',
+                key: 'media-key',
+                hash: 'ipfs-hash'
+            }))
 
             mockIpfsRepository.pinJson.mockImplementation(() => {
                 return Promise.resolve({
@@ -2955,6 +2961,12 @@ describe('app', function () {
                     fileId: 'fileId'
                 })
 
+            expect(mockUserRepository.getUserByOauthId).toHaveBeenCalledTimes(1)
+            expect(mockUserRepository.getUserByOauthId).toHaveBeenCalledWith('jwt_sub')
+
+            expect(mockMediaRepository.getMediaItem).toHaveBeenCalledTimes(1)
+            expect(mockMediaRepository.getMediaItem).toHaveBeenCalledWith('fileId')
+
             expect(mockS3Repository.getFileMetadata).toHaveBeenCalledTimes(1)
             expect(mockS3Repository.getFileMetadata).toHaveBeenCalledWith('fileId')
 
@@ -2963,7 +2975,7 @@ describe('app', function () {
                 assetName: 'asset name',
                 assetDescription: 'asset description',
                 assetProperties: { property: 'property' },
-                fileIpfsHash: 'ipfs_file_hash',
+                fileIpfsHash: 'ipfs-hash',
                 fileName: 'fileId',
                 fileMimetype: 'content/type'
             })
@@ -2986,7 +2998,7 @@ describe('app', function () {
                 })
 
             expect(mockS3Repository.getFileMetadata).not.toHaveBeenCalled()
-            expect(mockMediaRepository.getIpfsHashByFileId).not.toHaveBeenCalled()
+            expect(mockMediaRepository.getMediaItem).not.toHaveBeenCalled()
             expect(mockIpfsRepository.pinJson).not.toHaveBeenCalled()
 
             expect(response.status).toBe(400)
@@ -3006,7 +3018,7 @@ describe('app', function () {
                 })
 
             expect(mockS3Repository.getFileMetadata).not.toHaveBeenCalled()
-            expect(mockMediaRepository.getIpfsHashByFileId).not.toHaveBeenCalled()
+            expect(mockMediaRepository.getMediaItem).not.toHaveBeenCalled()
             expect(mockIpfsRepository.pinJson).not.toHaveBeenCalled()
 
             expect(response.status).toBe(400)
@@ -3026,7 +3038,7 @@ describe('app', function () {
                 })
 
             expect(mockS3Repository.getFileMetadata).not.toHaveBeenCalled()
-            expect(mockMediaRepository.getIpfsHashByFileId).not.toHaveBeenCalled()
+            expect(mockMediaRepository.getMediaItem).not.toHaveBeenCalled()
             expect(mockIpfsRepository.pinJson).not.toHaveBeenCalled()
 
             expect(response.status).toBe(400)
@@ -3044,7 +3056,7 @@ describe('app', function () {
             })
 
             expect(mockS3Repository.getFileMetadata).not.toHaveBeenCalled()
-            expect(mockMediaRepository.getIpfsHashByFileId).not.toHaveBeenCalled()
+            expect(mockMediaRepository.getMediaItem).not.toHaveBeenCalled()
             expect(mockIpfsRepository.pinJson).not.toHaveBeenCalled()
 
             expect(response.status).toBe(400)
@@ -3055,7 +3067,7 @@ describe('app', function () {
         })
 
         it('should return 400 when calling ipfs metadata endpoint and file id not found', async () => {
-            mockMediaRepository.getIpfsHashByFileId.mockImplementation(() => null)
+            mockMediaRepository.getMediaItem.mockImplementation(() => Promise.reject(new AssetNotFoundError()))
 
             const response = await request(app.callback())
                 .post('/ipfs/metadata')
@@ -3065,48 +3077,82 @@ describe('app', function () {
                     assetDescription: 'asset description',
                     assetProperties: { property: 'property' }
                 })
-
-            expect(mockMediaRepository.getIpfsHashByFileId).toHaveBeenCalledTimes(1)
-            expect(mockMediaRepository.getIpfsHashByFileId).toHaveBeenCalledWith('fileId')
-
-            expect(mockUserRepository.getUserByOauthId).not.toHaveBeenCalled()
-            expect(mockS3Repository.getFileMetadata).not.toHaveBeenCalled()
-            expect(mockIpfsRepository.pinJson).not.toHaveBeenCalled()
-
-            expect(response.status).toBe(404)
-            expect(response.body).toEqual({
-                error: 'FileIdNotFoundError',
-                message: 'The specified file id was not found'
-            })
-        })
-
-        it('should return 404 when calling ipfs metadata endpoint and user not found', async () => {
-            mockUserRepository.getUserByOauthId.mockImplementation(() => {
-                throw new UserNotFoundError()
-            })
-
-            const response = await request(app.callback())
-                .post('/ipfs/metadata')
-                .send({
-                    fileId: 'fileId',
-                    assetName: 'asset name',
-                    assetDescription: 'asset description',
-                    assetProperties: { property: 'property' }
-                })
-
-            expect(mockMediaRepository.getIpfsHashByFileId).toHaveBeenCalledTimes(1)
-            expect(mockMediaRepository.getIpfsHashByFileId).toHaveBeenCalledWith('fileId')
 
             expect(mockUserRepository.getUserByOauthId).toHaveBeenCalledTimes(1)
             expect(mockUserRepository.getUserByOauthId).toHaveBeenCalledWith('jwt_sub')
 
-            expect(mockS3Repository.getFileMetadata).not.toHaveBeenCalled()
+            expect(mockMediaRepository.getMediaItem).toHaveBeenCalledTimes(1)
+            expect(mockMediaRepository.getMediaItem).toHaveBeenCalledWith('fileId')
+
+            expect(mockS3Repository.getFileMetadata).toHaveBeenCalledTimes(1)
+            expect(mockS3Repository.getFileMetadata).toHaveBeenCalledWith('fileId')
+
+            expect(mockIpfsRepository.pinJson).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(404)
+            expect(response.body).toEqual({
+                error: 'AssetNotFoundError',
+                message: 'Asset specified not found'
+            })
+        })
+
+        it('should return 404 when calling ipfs metadata endpoint and user not found', async () => {
+            mockUserRepository.getUserByOauthId.mockImplementation(() => Promise.reject(new UserNotFoundError()))
+
+            const response = await request(app.callback())
+                .post('/ipfs/metadata')
+                .send({
+                    fileId: 'fileId',
+                    assetName: 'asset name',
+                    assetDescription: 'asset description',
+                    assetProperties: { property: 'property' }
+                })
+
+            expect(mockMediaRepository.getMediaItem).toHaveBeenCalledTimes(1)
+            expect(mockMediaRepository.getMediaItem).toHaveBeenCalledWith('fileId')
+
+            expect(mockUserRepository.getUserByOauthId).toHaveBeenCalledTimes(1)
+            expect(mockUserRepository.getUserByOauthId).toHaveBeenCalledWith('jwt_sub')
+
+            expect(mockS3Repository.getFileMetadata).toHaveBeenCalledTimes(1)
+            expect(mockS3Repository.getFileMetadata).toHaveBeenCalledWith('fileId')
+
             expect(mockIpfsRepository.pinJson).not.toHaveBeenCalled()
 
             expect(response.status).toBe(404)
             expect(response.body).toEqual({
                 error: 'UserNotFoundError',
                 message: 'User specified not found'
+            })
+        })
+
+        it('should return 404 when calling ipfs metadata endpoint and s3 file metadata not found', async () => {
+            mockS3Repository.getFileMetadata.mockImplementation(() => Promise.reject(new S3KeyNotFoundError()))
+
+            const response = await request(app.callback())
+                .post('/ipfs/metadata')
+                .send({
+                    fileId: 'fileId',
+                    assetName: 'asset name',
+                    assetDescription: 'asset description',
+                    assetProperties: { property: 'property' }
+                })
+
+            expect(mockMediaRepository.getMediaItem).toHaveBeenCalledTimes(1)
+            expect(mockMediaRepository.getMediaItem).toHaveBeenCalledWith('fileId')
+
+            expect(mockUserRepository.getUserByOauthId).toHaveBeenCalledTimes(1)
+            expect(mockUserRepository.getUserByOauthId).toHaveBeenCalledWith('jwt_sub')
+
+            expect(mockS3Repository.getFileMetadata).toHaveBeenCalledTimes(1)
+            expect(mockS3Repository.getFileMetadata).toHaveBeenCalledWith('fileId')
+
+            expect(mockIpfsRepository.pinJson).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(404)
+            expect(response.body).toEqual({
+                error: 'S3KeyNotFoundError',
+                message: 'The specified key was not found'
             })
         })
     })
@@ -3173,12 +3219,17 @@ describe('app', function () {
 
     describe('get media', function () {
         it('should return 200 when calling media endpoint', async () => {
-            mockMediaRepository.getMediaFileIds.mockImplementation(() => [{ media: 'media' }])
-            const response = await request(app.callback()).get('/media')
+            mockMediaRepository.getMediaByType.mockImplementation(() => ({
+                media: 'media'
+            }))
+            const response = await request(app.callback()).get('/media/place')
+
+            expect(mockMediaRepository.getMediaByType).toHaveBeenCalledTimes(1)
+            expect(mockMediaRepository.getMediaByType).toHaveBeenCalledWith({ type: 'place' })
 
             expect(response.status).toBe(200)
             expect(response.body).toEqual({
-                media: [{ media: 'media' }]
+                media: 'media'
             })
         })
     })
