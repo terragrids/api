@@ -45,58 +45,58 @@ export default class IpfsRepository {
         }
     }
 
-    async pinJson({ assetName, assetDescription, assetProperties, fileIpfsHash, fileMimetype }) {
+    async pinJson({ name, description, properties, fileIpfsHash, fileMimetype }) {
         try {
             const fileIntegrity = this.convertIpfsCidV0ToByte32(fileIpfsHash)
             const imageIntegrity = `sha256-${fileIntegrity}`
 
             const metadata = {
-                name: assetName,
-                description: assetDescription,
+                name: name,
+                description: description,
                 image: `ipfs://${fileIpfsHash}`,
                 image_integrity: imageIntegrity,
                 image_mimetype: fileMimetype,
                 properties: {
-                    ...(assetProperties.price && {
+                    ...(properties.price && {
                         base_price: {
                             name: 'base price',
-                            value: assetProperties.price,
-                            display_value: `${assetProperties.price} ALGO`
+                            value: properties.price,
+                            display_value: `${properties.price} ALGO`
                         }
                     }),
-                    ...(assetProperties.rarity && {
+                    ...(properties.rarity && {
                         rarity: {
                             name: 'rarity',
-                            value: assetProperties.rarity,
-                            display_value: assetProperties.rarity
+                            value: properties.rarity,
+                            display_value: properties.rarity
                         }
                     }),
-                    ...(assetProperties.author && {
+                    ...(properties.author && {
                         author: {
                             name: 'author',
-                            value: assetProperties.author,
-                            display_value: assetProperties.author
+                            value: properties.author,
+                            display_value: properties.author
                         }
                     }),
-                    ...(assetProperties.power && {
+                    ...(properties.power && {
                         power: {
                             name: 'power',
-                            value: assetProperties.power,
-                            display_value: `${assetProperties.power} TRW`
+                            value: properties.power,
+                            display_value: `${properties.power} TRW`
                         }
                     }),
-                    ...(assetProperties.budget && {
+                    ...(properties.budget && {
                         budget: {
                             name: 'budget',
-                            value: assetProperties.budget,
-                            display_value: `${assetProperties.budget} ALGO`
+                            value: properties.budget,
+                            display_value: `${properties.budget} ALGO`
                         }
                     }),
-                    ...(assetProperties.type && {
+                    ...(properties.type && {
                         placeType: {
                             name: 'place type',
-                            value: assetProperties.type.code,
-                            display_value: assetProperties.type.name
+                            value: properties.type.code,
+                            display_value: properties.type.name
                         }
                     })
                 }
@@ -118,8 +118,8 @@ export default class IpfsRepository {
                 const integrity = this.convertIpfsCidV0ToByte32(json.Hash)
 
                 return {
+                    name,
                     hash: json.Hash,
-                    assetName,
                     integrity
                 }
             } else throw new Error('Unable to upload file to IPFS')

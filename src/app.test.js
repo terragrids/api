@@ -2781,7 +2781,7 @@ describe('app', function () {
             mockIpfsRepository.pinJson.mockImplementation(() => {
                 return Promise.resolve({
                     hash: 'JsonIpfsHash',
-                    assetName: 'asset-name',
+                    name: 'asset-name',
                     integrity: 'json-integrity'
                 })
             })
@@ -2789,9 +2789,9 @@ describe('app', function () {
             const response = await request(app.callback())
                 .post('/ipfs/files')
                 .send({
-                    assetName: 'asset name',
-                    assetDescription: 'asset description',
-                    assetProperties: { property: 'property' },
+                    name: 'asset name',
+                    description: 'asset description',
+                    properties: { property: 'property' },
                     fileId: 'fileId'
                 })
 
@@ -2803,17 +2803,16 @@ describe('app', function () {
 
             expect(mockIpfsRepository.pinJson).toHaveBeenCalledTimes(1)
             expect(mockIpfsRepository.pinJson).toHaveBeenCalledWith({
-                assetName: 'asset name',
-                assetDescription: 'asset description',
-                assetProperties: { property: 'property' },
+                name: 'asset name',
+                description: 'asset description',
+                properties: { property: 'property' },
                 fileIpfsHash: 'FileIpfsHash',
-                fileName: 'fileId',
                 fileMimetype: 'content/type'
             })
 
             expect(response.status).toBe(201)
             expect(response.body).toEqual({
-                assetName: 'asset-name',
+                name: 'asset-name',
                 url: 'ipfs://JsonIpfsHash',
                 integrity: 'json-integrity'
             })
@@ -2823,9 +2822,9 @@ describe('app', function () {
             const response = await request(app.callback())
                 .post('/ipfs/files')
                 .send({
-                    assetDescription: 'asset description',
-                    fileId: 'fileId',
-                    assetProperties: { properties: 'properties' }
+                    description: 'asset description',
+                    properties: { properties: 'properties' },
+                    fileId: 'fileId'
                 })
 
             expect(mockS3Repository.getFileReadStream).not.toHaveBeenCalled()
@@ -2835,7 +2834,7 @@ describe('app', function () {
             expect(response.status).toBe(400)
             expect(response.body).toEqual({
                 error: 'MissingParameterError',
-                message: 'assetName must be specified'
+                message: 'name must be specified'
             })
         })
 
@@ -2843,9 +2842,9 @@ describe('app', function () {
             const response = await request(app.callback())
                 .post('/ipfs/files')
                 .send({
-                    assetName: 'asset name',
+                    name: 'asset name',
                     fileId: 'fileId',
-                    assetProperties: { properties: 'properties' }
+                    properties: { properties: 'properties' }
                 })
 
             expect(mockS3Repository.getFileReadStream).not.toHaveBeenCalled()
@@ -2855,14 +2854,14 @@ describe('app', function () {
             expect(response.status).toBe(400)
             expect(response.body).toEqual({
                 error: 'MissingParameterError',
-                message: 'assetDescription must be specified'
+                message: 'description must be specified'
             })
         })
 
         it('should return 400 when calling ipfs files endpoint and asset properties missing', async () => {
             const response = await request(app.callback()).post('/ipfs/files').send({
-                assetName: 'asset name',
-                assetDescription: 'asset description',
+                name: 'asset name',
+                description: 'asset description',
                 fileId: 'fileId'
             })
 
@@ -2873,7 +2872,7 @@ describe('app', function () {
             expect(response.status).toBe(400)
             expect(response.body).toEqual({
                 error: 'MissingParameterError',
-                message: 'assetProperties must be specified'
+                message: 'properties must be specified'
             })
         })
 
@@ -2881,9 +2880,9 @@ describe('app', function () {
             const response = await request(app.callback())
                 .post('/ipfs/files')
                 .send({
-                    assetName: 'asset name',
-                    assetDescription: 'asset description',
-                    assetProperties: { properties: 'properties' }
+                    name: 'asset name',
+                    description: 'asset description',
+                    properties: { properties: 'properties' }
                 })
 
             expect(mockS3Repository.getFileReadStream).not.toHaveBeenCalled()
@@ -2905,9 +2904,9 @@ describe('app', function () {
             const response = await request(app.callback())
                 .post('/ipfs/files')
                 .send({
-                    assetName: 'asset name',
-                    assetDescription: 'asset description',
-                    assetProperties: { property: 'property' },
+                    name: 'asset name',
+                    description: 'asset description',
+                    properties: { property: 'property' },
                     fileId: 'fileId'
                 })
 
@@ -2947,7 +2946,7 @@ describe('app', function () {
             mockIpfsRepository.pinJson.mockImplementation(() => {
                 return Promise.resolve({
                     hash: 'ipfs_metadata_hash',
-                    assetName: 'asset-name',
+                    name: 'asset-name',
                     integrity: 'json-integrity'
                 })
             })
@@ -2955,9 +2954,9 @@ describe('app', function () {
             const response = await request(app.callback())
                 .post('/ipfs/metadata')
                 .send({
-                    assetName: 'asset name',
-                    assetDescription: 'asset description',
-                    assetProperties: { property: 'property' },
+                    name: 'asset name',
+                    description: 'asset description',
+                    properties: { property: 'property' },
                     fileId: 'fileId'
                 })
 
@@ -2972,17 +2971,16 @@ describe('app', function () {
 
             expect(mockIpfsRepository.pinJson).toHaveBeenCalledTimes(1)
             expect(mockIpfsRepository.pinJson).toHaveBeenCalledWith({
-                assetName: 'asset name',
-                assetDescription: 'asset description',
-                assetProperties: { property: 'property' },
+                name: 'asset name',
+                description: 'asset description',
+                properties: { property: 'property' },
                 fileIpfsHash: 'ipfs-hash',
-                fileName: 'fileId',
                 fileMimetype: 'content/type'
             })
 
             expect(response.status).toBe(201)
             expect(response.body).toEqual({
-                assetName: 'asset-name',
+                name: 'asset-name',
                 url: 'ipfs://ipfs_metadata_hash',
                 integrity: 'json-integrity'
             })
@@ -2992,9 +2990,9 @@ describe('app', function () {
             const response = await request(app.callback())
                 .post('/ipfs/metadata')
                 .send({
-                    assetName: 'asset name',
-                    assetDescription: 'asset description',
-                    assetProperties: { property: 'property' }
+                    name: 'asset name',
+                    description: 'asset description',
+                    properties: { property: 'property' }
                 })
 
             expect(mockS3Repository.getFileMetadata).not.toHaveBeenCalled()
@@ -3013,8 +3011,8 @@ describe('app', function () {
                 .post('/ipfs/metadata')
                 .send({
                     fileId: 'fileId',
-                    assetDescription: 'asset description',
-                    assetProperties: { property: 'property' }
+                    description: 'asset description',
+                    properties: { property: 'property' }
                 })
 
             expect(mockS3Repository.getFileMetadata).not.toHaveBeenCalled()
@@ -3024,7 +3022,7 @@ describe('app', function () {
             expect(response.status).toBe(400)
             expect(response.body).toEqual({
                 error: 'MissingParameterError',
-                message: 'assetName must be specified'
+                message: 'name must be specified'
             })
         })
 
@@ -3033,8 +3031,8 @@ describe('app', function () {
                 .post('/ipfs/metadata')
                 .send({
                     fileId: 'fileId',
-                    assetName: 'asset name',
-                    assetProperties: { property: 'property' }
+                    name: 'asset name',
+                    properties: { property: 'property' }
                 })
 
             expect(mockS3Repository.getFileMetadata).not.toHaveBeenCalled()
@@ -3044,15 +3042,15 @@ describe('app', function () {
             expect(response.status).toBe(400)
             expect(response.body).toEqual({
                 error: 'MissingParameterError',
-                message: 'assetDescription must be specified'
+                message: 'description must be specified'
             })
         })
 
         it('should return 404 when calling ipfs metadata endpoint and asset properties missing', async () => {
             const response = await request(app.callback()).post('/ipfs/metadata').send({
                 fileId: 'fileId',
-                assetName: 'asset name',
-                assetDescription: 'asset description'
+                name: 'asset name',
+                description: 'asset description'
             })
 
             expect(mockS3Repository.getFileMetadata).not.toHaveBeenCalled()
@@ -3062,7 +3060,7 @@ describe('app', function () {
             expect(response.status).toBe(400)
             expect(response.body).toEqual({
                 error: 'MissingParameterError',
-                message: 'assetProperties must be specified'
+                message: 'properties must be specified'
             })
         })
 
@@ -3073,9 +3071,9 @@ describe('app', function () {
                 .post('/ipfs/metadata')
                 .send({
                     fileId: 'fileId',
-                    assetName: 'asset name',
-                    assetDescription: 'asset description',
-                    assetProperties: { property: 'property' }
+                    name: 'asset name',
+                    description: 'asset description',
+                    properties: { property: 'property' }
                 })
 
             expect(mockUserRepository.getUserByOauthId).toHaveBeenCalledTimes(1)
@@ -3103,9 +3101,9 @@ describe('app', function () {
                 .post('/ipfs/metadata')
                 .send({
                     fileId: 'fileId',
-                    assetName: 'asset name',
-                    assetDescription: 'asset description',
-                    assetProperties: { property: 'property' }
+                    name: 'asset name',
+                    description: 'asset description',
+                    properties: { property: 'property' }
                 })
 
             expect(mockMediaRepository.getMediaItem).toHaveBeenCalledTimes(1)
@@ -3133,9 +3131,9 @@ describe('app', function () {
                 .post('/ipfs/metadata')
                 .send({
                     fileId: 'fileId',
-                    assetName: 'asset name',
-                    assetDescription: 'asset description',
-                    assetProperties: { property: 'property' }
+                    name: 'asset name',
+                    description: 'asset description',
+                    properties: { property: 'property' }
                 })
 
             expect(mockMediaRepository.getMediaItem).toHaveBeenCalledTimes(1)

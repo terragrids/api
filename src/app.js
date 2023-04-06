@@ -379,12 +379,12 @@ router.post('/files/upload', jwtAuthorize, bodyparser(), async ctx => {
 })
 
 /**
- * Transfers files from S3 to IPFS and pins files and metadata
+ * Transfers a file from S3 to IPFS and pins file and metadata
  */
 router.post('/ipfs/files', jwtAuthorize, bodyparser(), async ctx => {
-    if (!ctx.request.body.assetName) throw new MissingParameterError('assetName')
-    if (!ctx.request.body.assetDescription) throw new MissingParameterError('assetDescription')
-    if (!ctx.request.body.assetProperties) throw new MissingParameterError('assetProperties')
+    if (!ctx.request.body.name) throw new MissingParameterError('name')
+    if (!ctx.request.body.description) throw new MissingParameterError('description')
+    if (!ctx.request.body.properties) throw new MissingParameterError('properties')
     if (!ctx.request.body.fileId) throw new MissingParameterError('fileId')
 
     await new UserRepository().getUserByOauthId(ctx.state.jwt.sub)
@@ -394,16 +394,15 @@ router.post('/ipfs/files', jwtAuthorize, bodyparser(), async ctx => {
     const s3Object = await s3.getFileReadStream(ctx.request.body.fileId)
     const resultFile = await ipfs.pinFile(s3Object.fileStream, ctx.request.body.fileId, s3Object.contentLength)
     const resultMeta = await ipfs.pinJson({
-        assetName: ctx.request.body.assetName,
-        assetDescription: ctx.request.body.assetDescription,
-        assetProperties: ctx.request.body.assetProperties,
+        name: ctx.request.body.name,
+        description: ctx.request.body.description,
+        properties: ctx.request.body.properties,
         fileIpfsHash: resultFile.hash,
-        fileName: ctx.request.body.fileId,
         fileMimetype: s3Object.contentType
     })
 
     ctx.body = {
-        assetName: resultMeta.assetName,
+        name: resultMeta.name,
         url: `ipfs://${resultMeta.hash}`,
         integrity: resultMeta.integrity
     }
@@ -414,26 +413,25 @@ router.post('/ipfs/files', jwtAuthorize, bodyparser(), async ctx => {
  * Pins new metadata files to IPFS referring to pre-loaded media files on S3 and IPFS
  */
 router.post('/ipfs/metadata', jwtAuthorize, bodyparser(), async ctx => {
-    if (!ctx.request.body.assetName) throw new MissingParameterError('assetName')
-    if (!ctx.request.body.assetDescription) throw new MissingParameterError('assetDescription')
-    if (!ctx.request.body.assetProperties) throw new MissingParameterError('assetProperties')
+    if (!ctx.request.body.name) throw new MissingParameterError('name')
+    if (!ctx.request.body.description) throw new MissingParameterError('description')
+    if (!ctx.request.body.properties) throw new MissingParameterError('properties')
     if (!ctx.request.body.fileId) throw new MissingParameterError('fileId')
 
     const [, s3Object, mediaItem] = await Promise.all([new UserRepository().getUserByOauthId(ctx.state.jwt.sub), new S3Repository().getFileMetadata(ctx.request.body.fileId), new MediaRepository().getMediaItem(ctx.request.body.fileId)])
 
-    const resultMeta = await new IpfsRepository().pinJson({
-        assetName: ctx.request.body.assetName,
-        assetDescription: ctx.request.body.assetDescription,
-        assetProperties: ctx.request.body.assetProperties,
+    const result = await new IpfsRepository().pinJson({
+        name: ctx.request.body.name,
+        description: ctx.request.body.description,
+        properties: ctx.request.body.properties,
         fileIpfsHash: mediaItem.hash,
-        fileName: ctx.request.body.fileId,
         fileMimetype: s3Object.contentType
     })
 
     ctx.body = {
-        assetName: resultMeta.assetName,
-        url: `ipfs://${resultMeta.hash}`,
-        integrity: resultMeta.integrity
+        name: result.name,
+        url: `ipfs://${result.hash}`,
+        integrity: result.integrity
     }
     ctx.status = 201
 })
