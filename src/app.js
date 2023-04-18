@@ -439,6 +439,7 @@ router.post('/ipfs/metadata', jwtAuthorize, bodyparser(), async ctx => {
 router.get('/media/:type', async ctx => {
     const media = await new MediaRepository().getMediaByType({
         type: ctx.params.type,
+        rank: ctx.request.query.rank,
         sort: ctx.request.query.sort,
         pageSize: ctx.request.query.pageSize,
         nextPageKey: ctx.request.query.nextPageKey

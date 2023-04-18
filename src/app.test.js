@@ -3230,6 +3230,21 @@ describe('app', function () {
                 media: 'media'
             })
         })
+
+        it('should return 200 when calling media endpoint with rank', async () => {
+            mockMediaRepository.getMediaByType.mockImplementation(() => ({
+                media: 'media'
+            }))
+            const response = await request(app.callback()).get('/media/place?rank=5')
+
+            expect(mockMediaRepository.getMediaByType).toHaveBeenCalledTimes(1)
+            expect(mockMediaRepository.getMediaByType).toHaveBeenCalledWith({ type: 'place', rank: '5' })
+
+            expect(response.status).toBe(200)
+            expect(response.body).toEqual({
+                media: 'media'
+            })
+        })
     })
 
     describe('get user', function () {
