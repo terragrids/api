@@ -23,11 +23,15 @@ export default class MediaRepository extends DynamoDbRepository {
         })
 
         return {
-            media: data.items.map(asset => ({
-                id: asset.pk.S.replace('fileId|', ''),
-                key: asset.data.S.replace('media|', ''),
-                ...(withHash && { hash: asset.hash.S })
-            })),
+            media: data.items.map(asset => {
+                const data = asset.data.S.split('|')
+                return {
+                    id: asset.pk.S.replace('fileId|', ''),
+                    key: data[2],
+                    rank: parseInt(data[1]),
+                    ...(withHash && { hash: asset.hash.S })
+                }
+            }),
             ...(data.nextPageKey && { nextPageKey: data.nextPageKey })
         }
     }
