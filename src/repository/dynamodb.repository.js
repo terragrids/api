@@ -1,6 +1,8 @@
 import { ConditionalCheckFailedException, DeleteItemCommand, DescribeTableCommand, DynamoDBClient, GetItemCommand, PutItemCommand, QueryCommand, TransactWriteItemsCommand, UpdateItemCommand } from '@aws-sdk/client-dynamodb'
 import RepositoryError from '../error/repository.error.js'
 
+export const PERMISSION_ALL = 0
+
 export default class DynamoDbRepository {
     client
     table

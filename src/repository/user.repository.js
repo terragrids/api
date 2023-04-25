@@ -13,11 +13,12 @@ export default class UserRepository extends DynamoDbRepository {
                 gsi1pk: { S: `user|id|${userId}` },
                 ...(walletAddress && { gsi2pk: { S: `user|wallet|${walletAddress}` } }),
                 data: { S: `user|created|${now}` },
+                permissions: { NS: ['-1'] },
                 lastModified: { N: `${now}` }
             },
             itemLogName: 'user'
         })
-        return { id: userId }
+        return { id: userId, permissions: [] }
     }
 
     async getUserByOauthId(id) {
@@ -31,7 +32,8 @@ export default class UserRepository extends DynamoDbRepository {
             if (item)
                 return {
                     id: item.gsi1pk.S.replace('user|id|', ''),
-                    ...(item.walletAddress && { walletAddress: item.walletAddress.S })
+                    ...(item.walletAddress && { walletAddress: item.walletAddress.S }),
+                    permissions: item.permissions.NS.map(p => parseInt(p)).filter(p => p !== -1)
                 }
             else throw new UserNotFoundError()
         } catch (e) {

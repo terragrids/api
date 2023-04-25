@@ -23,6 +23,7 @@ import AuthRepository from './repository/auth.repository.js'
 import jwtAuthorize from './middleware/jwt-authorize.js'
 import UserRepository from './repository/user.repository.js'
 import MediaRepository from './repository/media.repository.js'
+import UserNotFoundError from './error/user-not-found.error.js'
 
 dotenv.config()
 export const app = new Koa()
@@ -44,7 +45,12 @@ router.get('/hc', async ctx => {
 
 router.get('/user', jwtAuthorize, async ctx => {
     const userRepository = new UserRepository()
-    let user = await userRepository.getUserByOauthId(ctx.state.jwt.sub)
+    let user
+    try {
+        user = await userRepository.getUserByOauthId(ctx.state.jwt.sub)
+    } catch (e) {
+        if (!(e instanceof UserNotFoundError)) throw e
+    }
 
     if (!user) {
         user = await userRepository.addUser({ oauthId: ctx.state.jwt.sub })

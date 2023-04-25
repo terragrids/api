@@ -3265,7 +3265,7 @@ describe('app', function () {
         })
 
         it('should return 200 when calling user endpoint and user is not in local db', async () => {
-            mockUserRepository.getUserByOauthId.mockImplementation(() => Promise.resolve(null))
+            mockUserRepository.getUserByOauthId.mockImplementation(() => Promise.reject(new UserNotFoundError()))
             mockUserRepository.addUser.mockImplementation(() => Promise.resolve({ id: 'new_user_id' }))
 
             const response = await request(app.callback()).get('/user')
@@ -3278,6 +3278,20 @@ describe('app', function () {
 
             expect(response.status).toBe(200)
             expect(response.body).toEqual({ id: 'new_user_id' })
+        })
+
+        it('should return 200 when calling user endpoint and db user fetch fails', async () => {
+            mockUserRepository.getUserByOauthId.mockImplementation(() => Promise.reject(new Error()))
+            mockUserRepository.addUser.mockImplementation(() => Promise.resolve({ id: 'new_user_id' }))
+
+            const response = await request(app.callback()).get('/user')
+
+            expect(mockUserRepository.getUserByOauthId).toHaveBeenCalledTimes(1)
+            expect(mockUserRepository.getUserByOauthId).toHaveBeenCalledWith('jwt_sub')
+
+            expect(mockUserRepository.addUser).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(500)
         })
     })
 
