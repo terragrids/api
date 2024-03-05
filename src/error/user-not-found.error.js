@@ -1,6 +1,6 @@
 import GenericError from './generic-error.js'
 
-export default class S3KeyNotFoundError extends GenericError {
+export default class UserNotFoundError extends GenericError {
     httpCode = 404
 
     constructor() {
@@ -9,8 +9,8 @@ export default class S3KeyNotFoundError extends GenericError {
 
     toJson() {
         return {
-            error: 'S3KeyNotFoundError',
-            message: 'The specified key was not found'
+            error: 'UserNotFoundError',
+            message: 'User specified not found'
         }
     }
 }

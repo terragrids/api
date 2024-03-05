@@ -6,85 +6,131 @@ import DynamoDbRepository from './dynamodb.repository.js'
 export default class TokenRepository extends DynamoDbRepository {
     pkTokenPrefix = 'asset'
     pkSolarPowerPlantPrefix = 'spp'
+    symbolPrefix = 'symbol'
     itemName = 'token'
 
-    async putTrclToken({ assetId, symbol, offchainUrl, power }) {
-        const params = {
-            TransactItems: [
-                this.getUpdateCountersTnxCommand({
-                    key: { pk: { S: this.pkSolarPowerPlantPrefix } },
-                    counters: [
-                        {
-                            name: 'powerCapacity',
-                            change: power.toString()
-                        }
-                    ]
-                }),
-                this.getPutTnxCommand({
+    async putToken({ assetId, symbol, offchainUrl, power, positionX, positionY }) {
+        // If the token is a Terracell NFT, add power capacity to the Solar Power Plant
+        if (power) {
+            const params = {
+                TransactItems: [
+                    this.getUpdateCountersTnxCommand({
+                        key: { pk: { S: this.pkSolarPowerPlantPrefix } },
+                        counters: [
+                            {
+                                name: 'powerCapacity',
+                                change: power.toString()
+                            }
+                        ]
+                    }),
+                    this.getPutTnxCommand({
+                        pk: { S: `${this.pkTokenPrefix}|${assetId}` },
+                        gsi1pk: { S: `${this.symbolPrefix}|${symbol}` },
+                        data: { S: `project||created|${Date.now()}` },
+                        offchainUrl: { S: offchainUrl },
+                        power: { N: power.toString() },
+                        ...(positionX && { positionX: { N: positionX.toString() } }),
+                        ...(positionY && { positionY: { N: positionY.toString() } })
+                    })
+                ]
+            }
+            return await this.transactWrite({
+                params,
+                itemLogName: this.itemName
+            })
+        } else {
+            // If the token is a Terraland or a Terrabuild NFT, just save it
+            return await this.put({
+                item: {
                     pk: { S: `${this.pkTokenPrefix}|${assetId}` },
-                    symbol: { S: symbol },
+                    gsi1pk: { S: `${this.symbolPrefix}|${symbol}` },
+                    data: { S: `project||created|${Date.now()}` },
                     offchainUrl: { S: offchainUrl },
-                    power: { N: power.toString() }
-                })
-            ]
+                    ...(positionX && { positionX: { N: positionX.toString() } }),
+                    ...(positionY && { positionY: { N: positionY.toString() } })
+                },
+                itemLogName: this.itemName
+            })
         }
-
-        return await this.transactWrite({
-            params,
-            itemLogName: this.itemName
-        })
-    }
-
-    async putTrldToken({ assetId, symbol, offchainUrl, positionX, positionY }) {
-        return await this.put({
-            item: {
-                pk: { S: `${this.pkTokenPrefix}|${assetId}` },
-                symbol: { S: symbol },
-                offchainUrl: { S: offchainUrl },
-                positionX: { N: positionX.toString() },
-                positionY: { N: positionY.toString() }
-            },
-            itemLogName: this.itemName
-        })
-    }
-
-    async putTrbdToken({ assetId, symbol, offchainUrl }) {
-        return await this.put({
-            item: {
-                pk: { S: `${this.pkTokenPrefix}|${assetId}` },
-                symbol: { S: symbol },
-                offchainUrl: { S: offchainUrl }
-            },
-            itemLogName: this.itemName
-        })
     }
 
     async getToken(assetId) {
         try {
-            const data = await this.get({
+            const response = await this.get({
                 key: { pk: { S: `${this.pkTokenPrefix}|${assetId}` } },
                 itemLogName: this.itemName
             })
 
-            return data.Item && data.Item.symbol
+            const item = response.Item
+
+            let symbol
+            if (item && item.gsi1pk) {
+                symbol = item.gsi1pk.S.replace('symbol|', '')
+            } else if (item && item.symbol) {
+                symbol = item.symbol.S
+            } else {
+                symbol = null
+            }
+
+            const data = item.data.S.split('|')
+            const status = data[2]
+            const date = data[3]
+
+            return item && symbol
                 ? {
                       id: assetId,
-                      symbol: data.Item.symbol.S,
-                      ...(data.Item.offchainUrl && data.Item.offchainUrl.S && { offchainUrl: data.Item.offchainUrl.S }),
-                      ...(data.Item.applicationId && data.Item.applicationId.S && { contractId: data.Item.applicationId.S }),
-                      ...(data.Item.contractInfo && data.Item.contractInfo.S && { contractInfo: data.Item.contractInfo.S }),
-                      ...(data.Item.sellerAddress && data.Item.sellerAddress.S && { sellerAddress: data.Item.sellerAddress.S }),
-                      ...(data.Item.assetPrice && data.Item.assetPrice.S && { assetPrice: data.Item.assetPrice.S }),
-                      ...(data.Item.assetPriceUnit && data.Item.assetPriceUnit.S && { assetPriceUnit: data.Item.assetPriceUnit.S }),
-                      ...(data.Item.verified && data.Item.applicationId && data.Item.applicationId.S && { verified: data.Item.verified.BOOL }),
-                      ...(data.Item.power && data.Item.power.N !== undefined && { power: parseInt(data.Item.power.N) }),
-                      ...(data.Item.positionX && data.Item.positionX.N !== undefined && { positionX: parseInt(data.Item.positionX.N) }),
-                      ...(data.Item.positionY && data.Item.positionY.N !== undefined && { positionY: parseInt(data.Item.positionY.N) })
+                      symbol,
+                      status,
+                      statusChanged: date,
+                      ...(item.offchainUrl && item.offchainUrl.S && { offchainUrl: item.offchainUrl.S }),
+                      ...(item.applicationId && item.applicationId.S && { contractId: item.applicationId.S }),
+                      ...(item.contractInfo && item.contractInfo.S && { contractInfo: item.contractInfo.S }),
+                      ...(item.sellerAddress && item.sellerAddress.S && { sellerAddress: item.sellerAddress.S }),
+                      ...(item.assetPrice && item.assetPrice.S && { assetPrice: item.assetPrice.S }),
+                      ...(item.assetPriceUnit && item.assetPriceUnit.S && { assetPriceUnit: item.assetPriceUnit.S }),
+                      ...(item.verified && item.applicationId && item.applicationId.S && { verified: item.verified.BOOL }),
+                      ...(item.power && item.power.N !== undefined && { power: parseInt(item.power.N) }),
+                      ...(item.positionX && item.positionX.N !== undefined && { positionX: parseInt(item.positionX.N) }),
+                      ...(item.positionY && item.positionY.N !== undefined && { positionY: parseInt(item.positionY.N) })
                   }
                 : null
         } catch (e) {
             if (e instanceof ConditionalCheckFailedException) throw new AssetNotFoundError()
             else throw e
+        }
+    }
+
+    async getTokensBySymbol({ symbol, projectId = '', status = 'created', pageSize, nextPageKey, sort }) {
+        const forward = sort && sort === 'desc' ? false : true
+        const data = await this.query({
+            indexName: 'gsi1',
+            conditionExpression: 'gsi1pk = :gsi1pk AND begins_with(#data, :project)',
+            attributeNames: { '#data': 'data' },
+            attributeValues: {
+                ':gsi1pk': { S: `symbol|${symbol}` },
+                ':project': { S: `project|${projectId}|${status}|` }
+            },
+            pageSize,
+            nextPageKey,
+            forward,
+            itemLogName: 'assets'
+        })
+
+        return {
+            assets: data.items.map(asset => {
+                const data = asset.data.S.split('|')
+                const status = data[2]
+                const date = data[3]
+                return {
+                    id: asset.pk.S.replace(`${this.pkTokenPrefix}|`, ''),
+                    status,
+                    statusChanged: date,
+                    ...(asset.name && { name: asset.name.S }),
+                    ...(asset.offchainUrl && { offchainUrl: asset.offchainUrl.S }),
+                    ...(asset.applicationId && { offchainUrl: asset.offchainUrl.S })
+                }
+            }),
+            ...(data.nextPageKey && { nextPageKey: data.nextPageKey })
         }
     }
 

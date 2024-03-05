@@ -1,6 +1,8 @@
 import { ConditionalCheckFailedException, DeleteItemCommand, DescribeTableCommand, DynamoDBClient, GetItemCommand, PutItemCommand, QueryCommand, TransactWriteItemsCommand, UpdateItemCommand } from '@aws-sdk/client-dynamodb'
 import RepositoryError from '../error/repository.error.js'
 
+export const PERMISSION_ALL = 0
+
 export default class DynamoDbRepository {
     client
     table
@@ -28,9 +30,10 @@ export default class DynamoDbRepository {
         }
     }
 
-    async query({ conditionExpression, attributeNames, attributeValues, pageSize = 1, nextPageKey, forward = true, itemLogName = 'item' }) {
+    async query({ indexName, conditionExpression, attributeNames, attributeValues, pageSize = 10, nextPageKey, forward = true, itemLogName = 'item' }) {
         const params = {
             TableName: this.table,
+            IndexName: indexName,
             KeyConditionExpression: conditionExpression,
             ExpressionAttributeNames: attributeNames,
             ExpressionAttributeValues: attributeValues,
@@ -42,7 +45,11 @@ export default class DynamoDbRepository {
         const command = new QueryCommand(params)
 
         try {
-            return await this.client.send(command)
+            const data = await this.client.send(command)
+            return {
+                items: data.Items || [],
+                nextPageKey: data.LastEvaluatedKey ? Buffer.from(JSON.stringify(data.LastEvaluatedKey)).toString('base64') : null
+            }
         } catch (e) {
             throw new RepositoryError(e, `Unable to get ${itemLogName}`)
         }
@@ -86,7 +93,7 @@ export default class DynamoDbRepository {
             UpdateExpression: updateExpression,
             ExpressionAttributeNames: attributeNames,
             ExpressionAttributeValues: attributeValues,
-            ...condition && { ConditionExpression: condition }
+            ...(condition && { ConditionExpression: condition })
         }
 
         const command = new UpdateItemCommand(params)
@@ -160,9 +167,9 @@ export default class DynamoDbRepository {
                 Key: key,
                 UpdateExpression: `add ${counters.map(c => `${c.name} :${c.name}`).join(',')}`,
                 ExpressionAttributeValues: {
-                    ...counters.reduce((map, counter) => (map[`:${counter.name}`] = { N: counter.change }, map), {})
+                    ...counters.reduce((map, counter) => ((map[`:${counter.name}`] = { N: counter.change }), map), {})
                 },
-                ...conditionExpression && { ConditionExpression: conditionExpression }
+                ...(conditionExpression && { ConditionExpression: conditionExpression })
             }
         }
     }

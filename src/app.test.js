@@ -1,5 +1,8 @@
 import { app } from './app.js'
 import request from 'supertest'
+import UserNotFoundError from './error/user-not-found.error.js'
+import AssetNotFoundError from './error/asset-not-found.error.js'
+import S3KeyNotFoundError from './error/s3-key-not-found-error.js'
 
 const mockAlgoIndexer = {
     callRandLabsIndexerEndpoint: jest.fn().mockImplementation(() => jest.fn()),
@@ -21,11 +24,32 @@ jest.mock('./repository/dynamodb.repository.js', () =>
     }))
 )
 
+jest.mock('./middleware/auth-handler.js', () =>
+    jest.fn().mockImplementation(async (ctx, next) => {
+        await next()
+    })
+)
+
+jest.mock('./middleware/jwt-authorize.js', () =>
+    jest.fn().mockImplementation(async (ctx, next) => {
+        ctx.state.jwt = { sub: 'jwt_sub' }
+        await next()
+    })
+)
+
+const mockAuthRepository = {
+    getAuthMessage: jest.fn().mockImplementation(() => jest.fn())
+}
+jest.mock('./repository/auth.repository.js', () =>
+    jest.fn().mockImplementation(() => ({
+        getAuthMessage: mockAuthRepository.getAuthMessage
+    }))
+)
+
 const mockTokenRepository = {
     getToken: jest.fn().mockImplementation(() => jest.fn()),
-    putTrclToken: jest.fn().mockImplementation(() => jest.fn()),
-    putTrldToken: jest.fn().mockImplementation(() => jest.fn()),
-    putTrbdToken: jest.fn().mockImplementation(() => jest.fn()),
+    getTokensBySymbol: jest.fn().mockImplementation(() => jest.fn()),
+    putToken: jest.fn().mockImplementation(() => jest.fn()),
     deleteToken: jest.fn().mockImplementation(() => jest.fn()),
     putTokenContract: jest.fn().mockImplementation(() => jest.fn()),
     deleteTokenContract: jest.fn().mockImplementation(() => jest.fn()),
@@ -35,14 +59,24 @@ const mockTokenRepository = {
 jest.mock('./repository/token.repository.js', () =>
     jest.fn().mockImplementation(() => ({
         getToken: mockTokenRepository.getToken,
-        putTrclToken: mockTokenRepository.putTrclToken,
-        putTrldToken: mockTokenRepository.putTrldToken,
-        putTrbdToken: mockTokenRepository.putTrbdToken,
+        getTokensBySymbol: mockTokenRepository.getTokensBySymbol,
+        putToken: mockTokenRepository.putToken,
         deleteToken: mockTokenRepository.deleteToken,
         putTokenContract: mockTokenRepository.putTokenContract,
         deleteTokenContract: mockTokenRepository.deleteTokenContract,
         getSpp: mockTokenRepository.getSpp,
         putSpp: mockTokenRepository.putSpp
+    }))
+)
+
+const mockUserRepository = {
+    getUserByOauthId: jest.fn().mockImplementation(() => jest.fn()),
+    addUser: jest.fn().mockImplementation(() => jest.fn())
+}
+jest.mock('./repository/user.repository.js', () =>
+    jest.fn().mockImplementation(() => ({
+        getUserByOauthId: mockUserRepository.getUserByOauthId,
+        addUser: mockUserRepository.addUser
     }))
 )
 
@@ -62,13 +96,26 @@ jest.mock('./repository/ipfs.repository.js', () =>
 const mockS3Repository = {
     testConnection: jest.fn().mockImplementation(() => jest.fn()),
     getFileReadStream: jest.fn().mockImplementation(() => jest.fn()),
+    getFileMetadata: jest.fn().mockImplementation(() => jest.fn()),
     getUploadSignedUrl: jest.fn().mockImplementation(() => jest.fn())
 }
 jest.mock('./repository/s3.repository.js', () =>
     jest.fn().mockImplementation(() => ({
         testConnection: mockS3Repository.testConnection,
         getFileReadStream: mockS3Repository.getFileReadStream,
+        getFileMetadata: mockS3Repository.getFileMetadata,
         getUploadSignedUrl: mockS3Repository.getUploadSignedUrl
+    }))
+)
+
+const mockMediaRepository = {
+    getMediaByType: jest.fn().mockImplementation(() => jest.fn()),
+    getMediaItem: jest.fn().mockImplementation(() => jest.fn())
+}
+jest.mock('./repository/media.repository.js', () =>
+    jest.fn().mockImplementation(() => ({
+        getMediaByType: mockMediaRepository.getMediaByType,
+        getMediaItem: mockMediaRepository.getMediaItem
     }))
 )
 
@@ -1043,7 +1090,7 @@ describe('app', function () {
     })
 
     describe('get nft endpoint', function () {
-        it('should return 200 when calling nft endpoint and assets found on both algo indexer and offchain db', async () => {
+        it('should return 200 when calling nft endpoint and assets found on both algo indexer and offchain db and no contract info', async () => {
             mockTokenRepository.getToken.mockImplementation(() =>
                 Promise.resolve({
                     id: 123,
@@ -1063,13 +1110,14 @@ describe('app', function () {
                                         name: 'Terracell #1',
                                         total: 1,
                                         decimals: 0,
+                                        reserve: 'reserve_address',
                                         'unit-name': 'TRCL',
                                         url: 'https://terragrids.org#1'
                                     }
                                 }
                             }
                         })
-                    case 'assets/123/balances':
+                    case 'assets/123/balances?currency-greater-than=0':
                         return Promise.resolve({
                             status: 200,
                             json: {
@@ -1104,7 +1152,10 @@ describe('app', function () {
 
             expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledTimes(2)
             expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/123')
-            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/123/balances')
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/123/balances?currency-greater-than=0')
+
+            expect(mockTokenRepository.getToken).toHaveBeenCalledTimes(1)
+            expect(mockTokenRepository.getToken).toHaveBeenCalledWith('123')
 
             expect(response.status).toBe(200)
             expect(response.body).toEqual({
@@ -1112,6 +1163,7 @@ describe('app', function () {
                     id: 123,
                     name: 'Terracell #1',
                     symbol: 'TRCL',
+                    reserve: 'reserve_address',
                     url: 'https://terragrids.org#1',
                     offchainUrl: 'offchain_url',
                     holders: [
@@ -1154,13 +1206,14 @@ describe('app', function () {
                                         name: 'Terracell #1',
                                         total: 1,
                                         decimals: 0,
+                                        reserve: 'reserve_address',
                                         'unit-name': 'TRCL',
                                         url: 'https://terragrids.org#1'
                                     }
                                 }
                             }
                         })
-                    case 'assets/123/balances':
+                    case 'assets/123/balances?currency-greater-than=0':
                         return Promise.resolve({
                             status: 200,
                             json: {
@@ -1195,7 +1248,7 @@ describe('app', function () {
 
             expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledTimes(2)
             expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/123')
-            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/123/balances')
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/123/balances?currency-greater-than=0')
 
             expect(response.status).toBe(200)
             expect(response.body).toEqual({
@@ -1204,6 +1257,7 @@ describe('app', function () {
                     name: 'Terracell #1',
                     symbol: 'TRCL',
                     url: 'https://terragrids.org#1',
+                    reserve: 'reserve_address',
                     offchainUrl: 'offchain_url',
                     contractId: 'contract-id',
                     contractInfo: 'contract-info',
@@ -1249,388 +1303,331 @@ describe('app', function () {
     })
 
     describe('get nft type endpoint', function () {
-        it('should return 200 when calling nft type endpoint and no assets found', async () => {
-            mockAlgoIndexer.callRandLabsIndexerEndpoint.mockImplementation(() =>
+        it('should return 200 when calling nft type endpoint and no assets found on db', async () => {
+            mockTokenRepository.getTokensBySymbol.mockImplementation(() =>
                 Promise.resolve({
-                    status: 200,
-                    json: {
-                        assets: []
-                    }
+                    assets: []
                 })
             )
 
             const response = await request(app.callback()).get('/nfts/type/symbol')
 
-            expect(mockAlgoIndexer.callRandLabsIndexerEndpoint).toHaveBeenCalledTimes(1)
-            expect(mockAlgoIndexer.callRandLabsIndexerEndpoint).toHaveBeenCalledWith('assets?unit=SYMBOL')
+            expect(mockTokenRepository.getTokensBySymbol).toHaveBeenCalledTimes(1)
+            expect(mockTokenRepository.getTokensBySymbol).toHaveBeenCalledWith({ symbol: 'SYMBOL' })
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).not.toHaveBeenCalled()
 
             expect(response.status).toBe(200)
             expect(response.body).toEqual({ assets: [] })
         })
 
-        it('should return 200 when calling nft type endpoint and trcl assets found', async () => {
-            mockAlgoIndexer.callRandLabsIndexerEndpoint.mockImplementation(() =>
+        it('should return 200 when calling nft type endpoint and assets found on db and in indexer', async () => {
+            mockTokenRepository.getTokensBySymbol.mockImplementation(() =>
                 Promise.resolve({
-                    status: 200,
-                    json: {
-                        assets: [
-                            {
-                                index: 1,
+                    assets: [
+                        {
+                            id: '1',
+                            offchainUrl: 'offchain_url_1',
+                            power: 11
+                        },
+                        {
+                            id: '2',
+                            offchainUrl: 'offchain_url_2',
+                            power: 15
+                        }
+                    ]
+                })
+            )
+            mockAlgoIndexer.callAlgonodeIndexerEndpoint.mockImplementation(path => {
+                const assetId = path.replace('assets/', '').replace('/balances?currency-greater-than=0', '')
+                if (path.includes('balances')) {
+                    return Promise.resolve({
+                        status: 200,
+                        json: {
+                            balances: [
+                                {
+                                    address: `address-${assetId}`,
+                                    amount: 1
+                                }
+                            ]
+                        }
+                    })
+                } else {
+                    return Promise.resolve({
+                        status: 200,
+                        json: {
+                            asset: {
+                                index: assetId,
                                 deleted: false,
                                 params: {
                                     decimals: 0,
-                                    name: 'Terracell #1',
+                                    name: `Terracell #${assetId}`,
                                     total: 1,
                                     'unit-name': 'TRCL',
-                                    url: 'https://terragrids.org#1'
-                                }
-                            },
-                            {
-                                index: 2,
-                                deleted: true,
-                                params: {
-                                    decimals: 0,
-                                    name: 'Terracell #2',
-                                    total: 1,
-                                    'unit-name': 'TRCL',
-                                    url: 'https://terragrids.org#2'
-                                }
-                            },
-                            {
-                                index: 3,
-                                deleted: false,
-                                params: {
-                                    decimals: 1,
-                                    name: 'Terracell #3',
-                                    total: 1,
-                                    'unit-name': 'TRCL',
-                                    url: 'https://terragrids.org#3'
-                                }
-                            },
-                            {
-                                index: 4,
-                                deleted: false,
-                                params: {
-                                    decimals: 0,
-                                    name: 'Terracell #4',
-                                    total: 100,
-                                    'unit-name': 'TRCL',
-                                    url: 'https://terragrids.org#4'
-                                }
-                            },
-                            {
-                                index: 5,
-                                deleted: false,
-                                params: {
-                                    decimals: 0,
-                                    name: 'Terracell #5',
-                                    total: 1,
-                                    'unit-name': 'TRCL',
-                                    url: 'https://terragrids.org#5'
+                                    url: `https://terragrids.org#${assetId}`
                                 }
                             }
-                        ]
-                    }
-                })
-            )
+                        }
+                    })
+                }
+            })
 
-            mockTokenRepository.getToken.mockImplementation(assetId =>
-                Promise.resolve({
-                    id: assetId,
-                    power: assetId + 10
-                })
-            )
+            const response = await request(app.callback()).get('/nfts/type/trcl?projectId=project_id&status=created&sort=desc&pageSize=5&nextPageKey=next_page_key')
 
-            const response = await request(app.callback()).get('/nfts/type/trcl')
+            expect(mockTokenRepository.getTokensBySymbol).toHaveBeenCalledTimes(1)
+            expect(mockTokenRepository.getTokensBySymbol).toHaveBeenCalledWith({
+                symbol: 'TRCL',
+                nextPageKey: 'next_page_key',
+                pageSize: '5',
+                projectId: 'project_id',
+                sort: 'desc',
+                status: 'created'
+            })
 
-            expect(mockAlgoIndexer.callRandLabsIndexerEndpoint).toHaveBeenCalledTimes(1)
-            expect(mockAlgoIndexer.callRandLabsIndexerEndpoint).toHaveBeenCalledWith('assets?unit=TRCL')
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledTimes(4)
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/1')
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/2')
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/1/balances?currency-greater-than=0')
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/2/balances?currency-greater-than=0')
 
             expect(response.status).toBe(200)
             expect(response.body).toEqual({
                 assets: [
                     {
-                        id: 1,
+                        id: '1',
                         name: 'Terracell #1',
-                        symbol: 'TRCL',
-                        url: 'https://terragrids.org#1',
-                        power: 11
+                        offchainUrl: 'offchain_url_1',
+                        power: 11,
+                        holders: [
+                            {
+                                address: 'address-1',
+                                amount: 1
+                            }
+                        ]
                     },
                     {
-                        id: 5,
-                        name: 'Terracell #5',
-                        symbol: 'TRCL',
-                        url: 'https://terragrids.org#5',
-                        power: 15
+                        id: '2',
+                        name: 'Terracell #2',
+                        offchainUrl: 'offchain_url_2',
+                        power: 15,
+                        holders: [
+                            {
+                                address: 'address-2',
+                                amount: 1
+                            }
+                        ]
                     }
                 ]
             })
         })
 
-        it('should return 200 when calling nft type endpoint and trld assets found', async () => {
-            mockAlgoIndexer.callRandLabsIndexerEndpoint.mockImplementation(() =>
+        it('should return 200 when calling nft type endpoint and assets found on db but absent in indexer', async () => {
+            mockTokenRepository.getTokensBySymbol.mockImplementation(() =>
                 Promise.resolve({
-                    status: 200,
-                    json: {
-                        assets: [
-                            {
-                                index: 1,
-                                deleted: false,
-                                params: {
-                                    decimals: 0,
-                                    name: 'Terraland #1',
-                                    total: 1,
-                                    'unit-name': 'TRLD',
-                                    url: 'https://terragrids.org#1'
-                                }
-                            },
-                            {
-                                index: 2,
-                                deleted: true,
-                                params: {
-                                    decimals: 0,
-                                    name: 'Terraland #2',
-                                    total: 1,
-                                    'unit-name': 'TRLD',
-                                    url: 'https://terragrids.org#2'
-                                }
-                            },
-                            {
-                                index: 3,
-                                deleted: false,
-                                params: {
-                                    decimals: 1,
-                                    name: 'Terraland #3',
-                                    total: 1,
-                                    'unit-name': 'TRLD',
-                                    url: 'https://terragrids.org#3'
-                                }
-                            },
-                            {
-                                index: 4,
-                                deleted: false,
-                                params: {
-                                    decimals: 0,
-                                    name: 'Terraland #4',
-                                    total: 100,
-                                    'unit-name': 'TRLD',
-                                    url: 'https://terragrids.org#4'
-                                }
-                            },
-                            {
-                                index: 5,
-                                deleted: false,
-                                params: {
-                                    decimals: 0,
-                                    name: 'Terraland #5',
-                                    total: 1,
-                                    'unit-name': 'TRLD',
-                                    url: 'https://terragrids.org#5'
-                                }
-                            }
-                        ]
-                    }
+                    assets: [
+                        {
+                            id: '1',
+                            offchainUrl: 'offchain_url_1',
+                            power: 11
+                        },
+                        {
+                            id: '2',
+                            offchainUrl: 'offchain_url_2',
+                            power: 15
+                        },
+                        {
+                            id: '3',
+                            offchainUrl: 'offchain_url_3',
+                            power: 25
+                        }
+                    ]
                 })
             )
-
-            mockTokenRepository.getToken.mockImplementation(assetId =>
-                Promise.resolve({
-                    id: assetId,
-                    positionX: assetId + 10,
-                    positionY: assetId + 11
-                })
-            )
+            mockAlgoIndexer.callAlgonodeIndexerEndpoint.mockImplementation(path => {
+                const assetId = path.replace('assets/', '').replace('/balances?currency-greater-than=0', '')
+                if (path.includes('balances')) {
+                    return Promise.resolve({
+                        status: 200,
+                        json: {
+                            balances: [
+                                {
+                                    address: `address-${assetId}`,
+                                    amount: 1
+                                }
+                            ]
+                        }
+                    })
+                } else {
+                    return assetId === '2'
+                        ? Promise.resolve({
+                              status: 404,
+                              json: {
+                                  message: 'not found'
+                              }
+                          })
+                        : Promise.resolve({
+                              status: 200,
+                              json: {
+                                  asset: {
+                                      index: assetId,
+                                      deleted: false,
+                                      params: {
+                                          decimals: 0,
+                                          name: `Terracell #${assetId}`,
+                                          total: 1,
+                                          'unit-name': 'TRCL',
+                                          url: `https://terragrids.org#${assetId}`
+                                      }
+                                  }
+                              }
+                          })
+                }
+            })
 
             const response = await request(app.callback()).get('/nfts/type/trcl')
 
-            expect(mockAlgoIndexer.callRandLabsIndexerEndpoint).toHaveBeenCalledTimes(1)
-            expect(mockAlgoIndexer.callRandLabsIndexerEndpoint).toHaveBeenCalledWith('assets?unit=TRCL')
+            expect(mockTokenRepository.getTokensBySymbol).toHaveBeenCalledTimes(1)
+            expect(mockTokenRepository.getTokensBySymbol).toHaveBeenCalledWith({ symbol: 'TRCL' })
+
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledTimes(6)
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/1')
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/2')
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/3')
+
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/1/balances?currency-greater-than=0')
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/2/balances?currency-greater-than=0')
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/3/balances?currency-greater-than=0')
 
             expect(response.status).toBe(200)
             expect(response.body).toEqual({
                 assets: [
                     {
-                        id: 1,
-                        name: 'Terraland #1',
-                        symbol: 'TRLD',
-                        url: 'https://terragrids.org#1',
-                        positionX: 11,
-                        positionY: 12
+                        id: '1',
+                        name: 'Terracell #1',
+                        offchainUrl: 'offchain_url_1',
+                        power: 11,
+                        holders: [
+                            {
+                                address: 'address-1',
+                                amount: 1
+                            }
+                        ]
                     },
                     {
-                        id: 5,
-                        name: 'Terraland #5',
-                        symbol: 'TRLD',
-                        url: 'https://terragrids.org#5',
-                        positionX: 15,
-                        positionY: 16
+                        id: '3',
+                        name: 'Terracell #3',
+                        offchainUrl: 'offchain_url_3',
+                        power: 25,
+                        holders: [
+                            {
+                                address: 'address-3',
+                                amount: 1
+                            }
+                        ]
                     }
                 ]
             })
         })
 
-        it('should return 200 when calling nft type endpoint and some assets found in db', async () => {
-            mockAlgoIndexer.callRandLabsIndexerEndpoint.mockImplementation(() =>
+        it('should return 200 when calling nft type endpoint and assets found on db but deleted in indexer', async () => {
+            mockTokenRepository.getTokensBySymbol.mockImplementation(() =>
                 Promise.resolve({
-                    status: 200,
-                    json: {
-                        assets: [
-                            {
-                                index: 1,
-                                deleted: false,
-                                params: {
-                                    decimals: 0,
-                                    name: 'Terracell #1',
-                                    total: 1,
-                                    'unit-name': 'TRCL',
-                                    url: 'https://terragrids.org#1'
-                                }
-                            },
-                            {
-                                index: 2,
-                                deleted: true,
-                                params: {
-                                    decimals: 0,
-                                    name: 'Terracell #2',
-                                    total: 1,
-                                    'unit-name': 'TRCL',
-                                    url: 'https://terragrids.org#2'
-                                }
-                            },
-                            {
-                                index: 3,
-                                deleted: false,
-                                params: {
-                                    decimals: 1,
-                                    name: 'Terracell #3',
-                                    total: 1,
-                                    'unit-name': 'TRCL',
-                                    url: 'https://terragrids.org#3'
-                                }
-                            },
-                            {
-                                index: 4,
-                                deleted: false,
-                                params: {
-                                    decimals: 0,
-                                    name: 'Terracell #4',
-                                    total: 100,
-                                    'unit-name': 'TRCL',
-                                    url: 'https://terragrids.org#4'
-                                }
-                            },
-                            {
-                                index: 5,
-                                deleted: false,
-                                params: {
-                                    decimals: 0,
-                                    name: 'Terracell #5',
-                                    total: 1,
-                                    'unit-name': 'TRCL',
-                                    url: 'https://terragrids.org#5'
-                                }
-                            }
-                        ]
-                    }
+                    assets: [
+                        {
+                            id: '1',
+                            offchainUrl: 'offchain_url_1',
+                            power: 11
+                        },
+                        {
+                            id: '2',
+                            offchainUrl: 'offchain_url_2',
+                            power: 15
+                        },
+                        {
+                            id: '3',
+                            offchainUrl: 'offchain_url_3',
+                            power: 25
+                        }
+                    ],
+                    nextPageKey: 'next_page_key'
                 })
             )
-
-            mockTokenRepository.getToken.mockImplementation(() => Promise.resolve({ id: 1 }))
+            mockAlgoIndexer.callAlgonodeIndexerEndpoint.mockImplementation(path => {
+                const assetId = path.replace('assets/', '').replace('/balances?currency-greater-than=0', '')
+                if (path.includes('balances')) {
+                    return Promise.resolve({
+                        status: 200,
+                        json: {
+                            balances: [
+                                {
+                                    address: `address-${assetId}`,
+                                    amount: 1
+                                }
+                            ]
+                        }
+                    })
+                } else {
+                    return Promise.resolve({
+                        status: 200,
+                        json: {
+                            asset: {
+                                index: assetId,
+                                deleted: assetId === '2',
+                                params: {
+                                    decimals: 0,
+                                    name: `Terracell #${assetId}`,
+                                    total: 1,
+                                    'unit-name': 'TRCL',
+                                    url: `https://terragrids.org#${assetId}`
+                                }
+                            }
+                        }
+                    })
+                }
+            })
 
             const response = await request(app.callback()).get('/nfts/type/trcl')
 
-            expect(mockAlgoIndexer.callRandLabsIndexerEndpoint).toHaveBeenCalledTimes(1)
-            expect(mockAlgoIndexer.callRandLabsIndexerEndpoint).toHaveBeenCalledWith('assets?unit=TRCL')
+            expect(mockTokenRepository.getTokensBySymbol).toHaveBeenCalledTimes(1)
+            expect(mockTokenRepository.getTokensBySymbol).toHaveBeenCalledWith({ symbol: 'TRCL' })
+
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledTimes(6)
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/1')
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/2')
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/3')
+
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/1/balances?currency-greater-than=0')
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/2/balances?currency-greater-than=0')
+            expect(mockAlgoIndexer.callAlgonodeIndexerEndpoint).toHaveBeenCalledWith('assets/3/balances?currency-greater-than=0')
 
             expect(response.status).toBe(200)
             expect(response.body).toEqual({
                 assets: [
                     {
-                        id: 1,
+                        id: '1',
                         name: 'Terracell #1',
-                        symbol: 'TRCL',
-                        url: 'https://terragrids.org#1'
-                    }
-                ]
-            })
-        })
-
-        it('should return 200 when calling nft type endpoint and no assets found in db', async () => {
-            mockAlgoIndexer.callRandLabsIndexerEndpoint.mockImplementation(() =>
-                Promise.resolve({
-                    status: 200,
-                    json: {
-                        assets: [
+                        offchainUrl: 'offchain_url_1',
+                        power: 11,
+                        holders: [
                             {
-                                index: 1,
-                                deleted: false,
-                                params: {
-                                    decimals: 0,
-                                    name: 'Terracell #1',
-                                    total: 1,
-                                    'unit-name': 'TRCL',
-                                    url: 'https://terragrids.org#1'
-                                }
-                            },
+                                address: 'address-1',
+                                amount: 1
+                            }
+                        ]
+                    },
+                    {
+                        id: '3',
+                        name: 'Terracell #3',
+                        offchainUrl: 'offchain_url_3',
+                        power: 25,
+                        holders: [
                             {
-                                index: 2,
-                                deleted: true,
-                                params: {
-                                    decimals: 0,
-                                    name: 'Terracell #2',
-                                    total: 1,
-                                    'unit-name': 'TRCL',
-                                    url: 'https://terragrids.org#2'
-                                }
-                            },
-                            {
-                                index: 3,
-                                deleted: false,
-                                params: {
-                                    decimals: 1,
-                                    name: 'Terracell #3',
-                                    total: 1,
-                                    'unit-name': 'TRCL',
-                                    url: 'https://terragrids.org#3'
-                                }
-                            },
-                            {
-                                index: 4,
-                                deleted: false,
-                                params: {
-                                    decimals: 0,
-                                    name: 'Terracell #4',
-                                    total: 100,
-                                    'unit-name': 'TRCL',
-                                    url: 'https://terragrids.org#4'
-                                }
-                            },
-                            {
-                                index: 5,
-                                deleted: false,
-                                params: {
-                                    decimals: 0,
-                                    name: 'Terracell #5',
-                                    total: 1,
-                                    'unit-name': 'TRCL',
-                                    url: 'https://terragrids.org#5'
-                                }
+                                address: 'address-3',
+                                amount: 1
                             }
                         ]
                     }
-                })
-            )
-
-            mockTokenRepository.getToken.mockImplementation(() => Promise.resolve({}))
-
-            const response = await request(app.callback()).get('/nfts/type/trcl')
-
-            expect(mockAlgoIndexer.callRandLabsIndexerEndpoint).toHaveBeenCalledTimes(1)
-            expect(mockAlgoIndexer.callRandLabsIndexerEndpoint).toHaveBeenCalledWith('assets?unit=TRCL')
-
-            expect(response.status).toBe(200)
-            expect(response.body).toEqual({
-                assets: []
+                ],
+                nextPageKey: 'next_page_key'
             })
         })
     })
@@ -1930,8 +1927,8 @@ describe('app', function () {
                 power: 10
             })
 
-            expect(mockTokenRepository.putTrclToken).toHaveBeenCalledTimes(1)
-            expect(mockTokenRepository.putTrclToken).toHaveBeenCalledWith({
+            expect(mockTokenRepository.putToken).toHaveBeenCalledTimes(1)
+            expect(mockTokenRepository.putToken).toHaveBeenCalledWith({
                 assetId: '123',
                 symbol: 'TRCL',
                 offchainUrl: 'offchain_url',
@@ -1951,8 +1948,8 @@ describe('app', function () {
                 positionY: 7
             })
 
-            expect(mockTokenRepository.putTrldToken).toHaveBeenCalledTimes(1)
-            expect(mockTokenRepository.putTrldToken).toHaveBeenCalledWith({
+            expect(mockTokenRepository.putToken).toHaveBeenCalledTimes(1)
+            expect(mockTokenRepository.putToken).toHaveBeenCalledWith({
                 assetId: '123',
                 symbol: 'TRLD',
                 offchainUrl: 'offchain_url',
@@ -1971,8 +1968,8 @@ describe('app', function () {
                 offchainUrl: 'offchain_url'
             })
 
-            expect(mockTokenRepository.putTrbdToken).toHaveBeenCalledTimes(1)
-            expect(mockTokenRepository.putTrbdToken).toHaveBeenCalledWith({
+            expect(mockTokenRepository.putToken).toHaveBeenCalledTimes(1)
+            expect(mockTokenRepository.putToken).toHaveBeenCalledWith({
                 assetId: '123',
                 symbol: 'TRBD',
                 offchainUrl: 'offchain_url'
@@ -1989,9 +1986,9 @@ describe('app', function () {
                 offchainUrl: 'offchain_url'
             })
 
-            expect(mockTokenRepository.putTrclToken).not.toHaveBeenCalled()
-            expect(mockTokenRepository.putTrldToken).not.toHaveBeenCalled()
-            expect(mockTokenRepository.putTrbdToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
 
             expect(response.status).toBe(400)
             expect(response.body).toEqual({
@@ -2006,9 +2003,9 @@ describe('app', function () {
                 offchainUrl: 'offchain_url'
             })
 
-            expect(mockTokenRepository.putTrclToken).not.toHaveBeenCalled()
-            expect(mockTokenRepository.putTrldToken).not.toHaveBeenCalled()
-            expect(mockTokenRepository.putTrbdToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
 
             expect(response.status).toBe(400)
             expect(response.body).toEqual({
@@ -2023,9 +2020,9 @@ describe('app', function () {
                 offchainUrl: 'offchain_url'
             })
 
-            expect(mockTokenRepository.putTrclToken).not.toHaveBeenCalled()
-            expect(mockTokenRepository.putTrldToken).not.toHaveBeenCalled()
-            expect(mockTokenRepository.putTrbdToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
 
             expect(response.status).toBe(400)
             expect(response.body).toEqual({
@@ -2040,9 +2037,9 @@ describe('app', function () {
                 symbol: 'TRCL'
             })
 
-            expect(mockTokenRepository.putTrclToken).not.toHaveBeenCalled()
-            expect(mockTokenRepository.putTrldToken).not.toHaveBeenCalled()
-            expect(mockTokenRepository.putTrbdToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
 
             expect(response.status).toBe(400)
             expect(response.body).toEqual({
@@ -2058,9 +2055,9 @@ describe('app', function () {
                 offchainUrl: 'offchain_url'
             })
 
-            expect(mockTokenRepository.putTrclToken).not.toHaveBeenCalled()
-            expect(mockTokenRepository.putTrldToken).not.toHaveBeenCalled()
-            expect(mockTokenRepository.putTrbdToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
 
             expect(response.status).toBe(400)
             expect(response.body).toEqual({
@@ -2077,9 +2074,9 @@ describe('app', function () {
                 power: 'meh'
             })
 
-            expect(mockTokenRepository.putTrclToken).not.toHaveBeenCalled()
-            expect(mockTokenRepository.putTrldToken).not.toHaveBeenCalled()
-            expect(mockTokenRepository.putTrbdToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
 
             expect(response.status).toBe(400)
             expect(response.body).toEqual({
@@ -2096,52 +2093,14 @@ describe('app', function () {
                 power: -12
             })
 
-            expect(mockTokenRepository.putTrclToken).not.toHaveBeenCalled()
-            expect(mockTokenRepository.putTrldToken).not.toHaveBeenCalled()
-            expect(mockTokenRepository.putTrbdToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
+            expect(mockTokenRepository.putToken).not.toHaveBeenCalled()
 
             expect(response.status).toBe(400)
             expect(response.body).toEqual({
                 error: 'TypePositiveNumberError',
                 message: 'power must be a positive number'
-            })
-        })
-
-        it('should return 400 when posting trld nft and positionX missing', async () => {
-            const response = await request(app.callback()).post('/nfts').send({
-                assetId: '123',
-                symbol: 'TRLD',
-                offchainUrl: 'offchain_url',
-                positionY: 10
-            })
-
-            expect(mockTokenRepository.putTrclToken).not.toHaveBeenCalled()
-            expect(mockTokenRepository.putTrldToken).not.toHaveBeenCalled()
-            expect(mockTokenRepository.putTrbdToken).not.toHaveBeenCalled()
-
-            expect(response.status).toBe(400)
-            expect(response.body).toEqual({
-                error: 'TypeNumberError',
-                message: 'positionX must be a number'
-            })
-        })
-
-        it('should return 400 when posting trld nft and positionY missing', async () => {
-            const response = await request(app.callback()).post('/nfts').send({
-                assetId: '123',
-                symbol: 'TRLD',
-                offchainUrl: 'offchain_url',
-                positionX: 10
-            })
-
-            expect(mockTokenRepository.putTrclToken).not.toHaveBeenCalled()
-            expect(mockTokenRepository.putTrldToken).not.toHaveBeenCalled()
-            expect(mockTokenRepository.putTrbdToken).not.toHaveBeenCalled()
-
-            expect(response.status).toBe(400)
-            expect(response.body).toEqual({
-                error: 'TypeNumberError',
-                message: 'positionY must be a number'
             })
         })
     })
@@ -2798,64 +2757,75 @@ describe('app', function () {
     })
 
     describe('post ipfs files endpoint', function () {
-        it('should return 201 when calling ipfs files endpoint and s3 file is found', async () => {
-            process.env.ALGO_APP_APPROVAL = 'approval_program_value'
+        beforeEach(() => {
+            mockUserRepository.getUserByOauthId.mockImplementation(() => ({
+                userId: 'user-id'
+            }))
+        })
 
+        it('should return 201 when calling ipfs files endpoint and s3 file is found', async () => {
             mockS3Repository.getFileReadStream.mockImplementation(() => {
                 return Promise.resolve({
                     fileStream: 'fileStream',
-                    contentType: 'content/type'
+                    contentType: 'content/type',
+                    contentLength: 123
                 })
             })
 
             mockIpfsRepository.pinFile.mockImplementation(() => {
                 return Promise.resolve({
-                    IpfsHash: 'FileIpfsHash'
+                    hash: 'FileIpfsHash'
                 })
             })
 
             mockIpfsRepository.pinJson.mockImplementation(() => {
                 return Promise.resolve({
-                    IpfsHash: 'JsonIpfsHash',
-                    assetName: 'asset-name',
+                    hash: 'JsonIpfsHash',
+                    name: 'asset-name',
                     integrity: 'json-integrity'
                 })
             })
 
-            const response = await request(app.callback()).post('/ipfs/files').send({
-                assetName: 'asset name',
-                assetDescription: 'asset description',
-                fileName: 'filename'
-            })
+            const response = await request(app.callback())
+                .post('/ipfs/files')
+                .send({
+                    name: 'asset name',
+                    description: 'asset description',
+                    properties: { property: 'property' },
+                    fileId: 'fileId'
+                })
 
             expect(mockS3Repository.getFileReadStream).toHaveBeenCalledTimes(1)
-            expect(mockS3Repository.getFileReadStream).toHaveBeenCalledWith('filename')
+            expect(mockS3Repository.getFileReadStream).toHaveBeenCalledWith('fileId')
 
             expect(mockIpfsRepository.pinFile).toHaveBeenCalledTimes(1)
-            expect(mockIpfsRepository.pinFile).toHaveBeenCalledWith('fileStream')
+            expect(mockIpfsRepository.pinFile).toHaveBeenCalledWith('fileStream', 'fileId', 123)
 
             expect(mockIpfsRepository.pinJson).toHaveBeenCalledTimes(1)
             expect(mockIpfsRepository.pinJson).toHaveBeenCalledWith({
-                assetName: 'asset name',
-                assetDescription: 'asset description',
+                name: 'asset name',
+                description: 'asset description',
+                properties: { property: 'property' },
                 fileIpfsHash: 'FileIpfsHash',
-                fileName: 'filename',
                 fileMimetype: 'content/type'
             })
 
             expect(response.status).toBe(201)
             expect(response.body).toEqual({
-                assetName: 'asset-name',
+                name: 'asset-name',
                 url: 'ipfs://JsonIpfsHash',
                 integrity: 'json-integrity'
             })
         })
 
-        it('should return 400 when calling ipfs files endpoint and asset name info missing', async () => {
-            const response = await request(app.callback()).post('/ipfs/files').send({
-                assetDescription: 'asset description',
-                fileName: 'filename'
-            })
+        it('should return 400 when calling ipfs files endpoint and asset name missing', async () => {
+            const response = await request(app.callback())
+                .post('/ipfs/files')
+                .send({
+                    description: 'asset description',
+                    properties: { properties: 'properties' },
+                    fileId: 'fileId'
+                })
 
             expect(mockS3Repository.getFileReadStream).not.toHaveBeenCalled()
             expect(mockIpfsRepository.pinFile).not.toHaveBeenCalled()
@@ -2864,15 +2834,18 @@ describe('app', function () {
             expect(response.status).toBe(400)
             expect(response.body).toEqual({
                 error: 'MissingParameterError',
-                message: 'assetName must be specified'
+                message: 'name must be specified'
             })
         })
 
-        it('should return 400 when calling ipfs files endpoint and asset description info missing', async () => {
-            const response = await request(app.callback()).post('/ipfs/files').send({
-                assetName: 'asset name',
-                fileName: 'filename'
-            })
+        it('should return 400 when calling ipfs files endpoint and asset description missing', async () => {
+            const response = await request(app.callback())
+                .post('/ipfs/files')
+                .send({
+                    name: 'asset name',
+                    fileId: 'fileId',
+                    properties: { properties: 'properties' }
+                })
 
             expect(mockS3Repository.getFileReadStream).not.toHaveBeenCalled()
             expect(mockIpfsRepository.pinFile).not.toHaveBeenCalled()
@@ -2881,14 +2854,15 @@ describe('app', function () {
             expect(response.status).toBe(400)
             expect(response.body).toEqual({
                 error: 'MissingParameterError',
-                message: 'assetDescription must be specified'
+                message: 'description must be specified'
             })
         })
 
-        it('should return 400 when calling ipfs files endpoint and file name info missing', async () => {
+        it('should return 400 when calling ipfs files endpoint and asset properties missing', async () => {
             const response = await request(app.callback()).post('/ipfs/files').send({
-                assetName: 'asset name',
-                assetDescription: 'asset description'
+                name: 'asset name',
+                description: 'asset description',
+                fileId: 'fileId'
             })
 
             expect(mockS3Repository.getFileReadStream).not.toHaveBeenCalled()
@@ -2898,15 +2872,297 @@ describe('app', function () {
             expect(response.status).toBe(400)
             expect(response.body).toEqual({
                 error: 'MissingParameterError',
-                message: 'fileName must be specified'
+                message: 'properties must be specified'
+            })
+        })
+
+        it('should return 400 when calling ipfs files endpoint and file id missing', async () => {
+            const response = await request(app.callback())
+                .post('/ipfs/files')
+                .send({
+                    name: 'asset name',
+                    description: 'asset description',
+                    properties: { properties: 'properties' }
+                })
+
+            expect(mockS3Repository.getFileReadStream).not.toHaveBeenCalled()
+            expect(mockIpfsRepository.pinFile).not.toHaveBeenCalled()
+            expect(mockIpfsRepository.pinJson).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(400)
+            expect(response.body).toEqual({
+                error: 'MissingParameterError',
+                message: 'fileId must be specified'
+            })
+        })
+
+        it('should return 404 when calling ipfs files endpoint and user not found', async () => {
+            mockUserRepository.getUserByOauthId.mockImplementation(() => {
+                throw new UserNotFoundError()
+            })
+
+            const response = await request(app.callback())
+                .post('/ipfs/files')
+                .send({
+                    name: 'asset name',
+                    description: 'asset description',
+                    properties: { property: 'property' },
+                    fileId: 'fileId'
+                })
+
+            expect(mockS3Repository.getFileReadStream).not.toHaveBeenCalled()
+            expect(mockIpfsRepository.pinFile).not.toHaveBeenCalled()
+            expect(mockIpfsRepository.pinJson).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(404)
+            expect(response.body).toEqual({
+                error: 'UserNotFoundError',
+                message: 'User specified not found'
+            })
+        })
+    })
+
+    describe('post ipfs metadata endpoint', function () {
+        beforeEach(() => {
+            mockUserRepository.getUserByOauthId.mockImplementation(() => ({
+                userId: 'user-id'
+            }))
+        })
+
+        it('should return 201 when calling ipfs metadata endpoint and s3 file is found', async () => {
+            mockS3Repository.getFileMetadata.mockImplementation(() => {
+                return Promise.resolve({
+                    contentType: 'content/type',
+                    contentLength: 123
+                })
+            })
+
+            mockMediaRepository.getMediaItem.mockImplementation(() => ({
+                id: 'file-id',
+                key: 'media-key',
+                hash: 'ipfs-hash'
+            }))
+
+            mockIpfsRepository.pinJson.mockImplementation(() => {
+                return Promise.resolve({
+                    hash: 'ipfs_metadata_hash',
+                    name: 'asset-name',
+                    integrity: 'json-integrity'
+                })
+            })
+
+            const response = await request(app.callback())
+                .post('/ipfs/metadata')
+                .send({
+                    name: 'asset name',
+                    description: 'asset description',
+                    properties: { property: 'property' },
+                    fileId: 'fileId'
+                })
+
+            expect(mockUserRepository.getUserByOauthId).toHaveBeenCalledTimes(1)
+            expect(mockUserRepository.getUserByOauthId).toHaveBeenCalledWith('jwt_sub')
+
+            expect(mockMediaRepository.getMediaItem).toHaveBeenCalledTimes(1)
+            expect(mockMediaRepository.getMediaItem).toHaveBeenCalledWith('fileId')
+
+            expect(mockS3Repository.getFileMetadata).toHaveBeenCalledTimes(1)
+            expect(mockS3Repository.getFileMetadata).toHaveBeenCalledWith('fileId')
+
+            expect(mockIpfsRepository.pinJson).toHaveBeenCalledTimes(1)
+            expect(mockIpfsRepository.pinJson).toHaveBeenCalledWith({
+                name: 'asset name',
+                description: 'asset description',
+                properties: { property: 'property' },
+                fileIpfsHash: 'ipfs-hash',
+                fileMimetype: 'content/type'
+            })
+
+            expect(response.status).toBe(201)
+            expect(response.body).toEqual({
+                name: 'asset-name',
+                url: 'ipfs://ipfs_metadata_hash',
+                integrity: 'json-integrity'
+            })
+        })
+
+        it('should return 400 when calling ipfs metadata endpoint and file id missing', async () => {
+            const response = await request(app.callback())
+                .post('/ipfs/metadata')
+                .send({
+                    name: 'asset name',
+                    description: 'asset description',
+                    properties: { property: 'property' }
+                })
+
+            expect(mockS3Repository.getFileMetadata).not.toHaveBeenCalled()
+            expect(mockMediaRepository.getMediaItem).not.toHaveBeenCalled()
+            expect(mockIpfsRepository.pinJson).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(400)
+            expect(response.body).toEqual({
+                error: 'MissingParameterError',
+                message: 'fileId must be specified'
+            })
+        })
+
+        it('should return 400 when calling ipfs metadata endpoint and asset name missing', async () => {
+            const response = await request(app.callback())
+                .post('/ipfs/metadata')
+                .send({
+                    fileId: 'fileId',
+                    description: 'asset description',
+                    properties: { property: 'property' }
+                })
+
+            expect(mockS3Repository.getFileMetadata).not.toHaveBeenCalled()
+            expect(mockMediaRepository.getMediaItem).not.toHaveBeenCalled()
+            expect(mockIpfsRepository.pinJson).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(400)
+            expect(response.body).toEqual({
+                error: 'MissingParameterError',
+                message: 'name must be specified'
+            })
+        })
+
+        it('should return 400 when calling ipfs metadata endpoint and asset description missing', async () => {
+            const response = await request(app.callback())
+                .post('/ipfs/metadata')
+                .send({
+                    fileId: 'fileId',
+                    name: 'asset name',
+                    properties: { property: 'property' }
+                })
+
+            expect(mockS3Repository.getFileMetadata).not.toHaveBeenCalled()
+            expect(mockMediaRepository.getMediaItem).not.toHaveBeenCalled()
+            expect(mockIpfsRepository.pinJson).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(400)
+            expect(response.body).toEqual({
+                error: 'MissingParameterError',
+                message: 'description must be specified'
+            })
+        })
+
+        it('should return 404 when calling ipfs metadata endpoint and asset properties missing', async () => {
+            const response = await request(app.callback()).post('/ipfs/metadata').send({
+                fileId: 'fileId',
+                name: 'asset name',
+                description: 'asset description'
+            })
+
+            expect(mockS3Repository.getFileMetadata).not.toHaveBeenCalled()
+            expect(mockMediaRepository.getMediaItem).not.toHaveBeenCalled()
+            expect(mockIpfsRepository.pinJson).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(400)
+            expect(response.body).toEqual({
+                error: 'MissingParameterError',
+                message: 'properties must be specified'
+            })
+        })
+
+        it('should return 400 when calling ipfs metadata endpoint and file id not found', async () => {
+            mockMediaRepository.getMediaItem.mockImplementation(() => Promise.reject(new AssetNotFoundError()))
+
+            const response = await request(app.callback())
+                .post('/ipfs/metadata')
+                .send({
+                    fileId: 'fileId',
+                    name: 'asset name',
+                    description: 'asset description',
+                    properties: { property: 'property' }
+                })
+
+            expect(mockUserRepository.getUserByOauthId).toHaveBeenCalledTimes(1)
+            expect(mockUserRepository.getUserByOauthId).toHaveBeenCalledWith('jwt_sub')
+
+            expect(mockMediaRepository.getMediaItem).toHaveBeenCalledTimes(1)
+            expect(mockMediaRepository.getMediaItem).toHaveBeenCalledWith('fileId')
+
+            expect(mockS3Repository.getFileMetadata).toHaveBeenCalledTimes(1)
+            expect(mockS3Repository.getFileMetadata).toHaveBeenCalledWith('fileId')
+
+            expect(mockIpfsRepository.pinJson).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(404)
+            expect(response.body).toEqual({
+                error: 'AssetNotFoundError',
+                message: 'Asset specified not found'
+            })
+        })
+
+        it('should return 404 when calling ipfs metadata endpoint and user not found', async () => {
+            mockUserRepository.getUserByOauthId.mockImplementation(() => Promise.reject(new UserNotFoundError()))
+
+            const response = await request(app.callback())
+                .post('/ipfs/metadata')
+                .send({
+                    fileId: 'fileId',
+                    name: 'asset name',
+                    description: 'asset description',
+                    properties: { property: 'property' }
+                })
+
+            expect(mockMediaRepository.getMediaItem).toHaveBeenCalledTimes(1)
+            expect(mockMediaRepository.getMediaItem).toHaveBeenCalledWith('fileId')
+
+            expect(mockUserRepository.getUserByOauthId).toHaveBeenCalledTimes(1)
+            expect(mockUserRepository.getUserByOauthId).toHaveBeenCalledWith('jwt_sub')
+
+            expect(mockS3Repository.getFileMetadata).toHaveBeenCalledTimes(1)
+            expect(mockS3Repository.getFileMetadata).toHaveBeenCalledWith('fileId')
+
+            expect(mockIpfsRepository.pinJson).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(404)
+            expect(response.body).toEqual({
+                error: 'UserNotFoundError',
+                message: 'User specified not found'
+            })
+        })
+
+        it('should return 404 when calling ipfs metadata endpoint and s3 file metadata not found', async () => {
+            mockS3Repository.getFileMetadata.mockImplementation(() => Promise.reject(new S3KeyNotFoundError()))
+
+            const response = await request(app.callback())
+                .post('/ipfs/metadata')
+                .send({
+                    fileId: 'fileId',
+                    name: 'asset name',
+                    description: 'asset description',
+                    properties: { property: 'property' }
+                })
+
+            expect(mockMediaRepository.getMediaItem).toHaveBeenCalledTimes(1)
+            expect(mockMediaRepository.getMediaItem).toHaveBeenCalledWith('fileId')
+
+            expect(mockUserRepository.getUserByOauthId).toHaveBeenCalledTimes(1)
+            expect(mockUserRepository.getUserByOauthId).toHaveBeenCalledWith('jwt_sub')
+
+            expect(mockS3Repository.getFileMetadata).toHaveBeenCalledTimes(1)
+            expect(mockS3Repository.getFileMetadata).toHaveBeenCalledWith('fileId')
+
+            expect(mockIpfsRepository.pinJson).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(404)
+            expect(response.body).toEqual({
+                error: 'S3KeyNotFoundError',
+                message: 'The specified key was not found'
             })
         })
     })
 
     describe('post files upload endpoint', function () {
-        it('should return 201 when calling files upload endpoint', async () => {
-            process.env.ALGO_APP_APPROVAL = 'approval_program_value'
+        beforeEach(() => {
+            mockUserRepository.getUserByOauthId.mockImplementation(() => ({
+                userId: 'user-id'
+            }))
+        })
 
+        it('should return 201 when calling files upload endpoint', async () => {
             mockS3Repository.getUploadSignedUrl.mockImplementation(() => {
                 return Promise.resolve({
                     id: 'id',
@@ -2937,6 +3193,130 @@ describe('app', function () {
             expect(response.body).toEqual({
                 error: 'MissingParameterError',
                 message: 'contentType must be specified'
+            })
+        })
+
+        it('should return 404 when calling files upload endpoint and user not found', async () => {
+            mockUserRepository.getUserByOauthId.mockImplementation(() => {
+                throw new UserNotFoundError()
+            })
+
+            const response = await request(app.callback()).post('/files/upload').send({
+                contentType: 'content/type'
+            })
+
+            expect(mockS3Repository.getUploadSignedUrl).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(404)
+            expect(response.body).toEqual({
+                error: 'UserNotFoundError',
+                message: 'User specified not found'
+            })
+        })
+    })
+
+    describe('get media', function () {
+        it('should return 200 when calling media endpoint', async () => {
+            mockMediaRepository.getMediaByType.mockImplementation(() => ({
+                media: 'media'
+            }))
+            const response = await request(app.callback()).get('/media/place')
+
+            expect(mockMediaRepository.getMediaByType).toHaveBeenCalledTimes(1)
+            expect(mockMediaRepository.getMediaByType).toHaveBeenCalledWith({ type: 'place' })
+
+            expect(response.status).toBe(200)
+            expect(response.body).toEqual({
+                media: 'media'
+            })
+        })
+
+        it('should return 200 when calling media endpoint with rank', async () => {
+            mockMediaRepository.getMediaByType.mockImplementation(() => ({
+                media: 'media'
+            }))
+            const response = await request(app.callback()).get('/media/place?rank=5')
+
+            expect(mockMediaRepository.getMediaByType).toHaveBeenCalledTimes(1)
+            expect(mockMediaRepository.getMediaByType).toHaveBeenCalledWith({ type: 'place', rank: '5' })
+
+            expect(response.status).toBe(200)
+            expect(response.body).toEqual({
+                media: 'media'
+            })
+        })
+    })
+
+    describe('get user', function () {
+        it('should return 200 when calling user endpoint and user is in local db', async () => {
+            mockUserRepository.getUserByOauthId.mockImplementation(() =>
+                Promise.resolve({
+                    id: 'user_id'
+                })
+            )
+
+            const response = await request(app.callback()).get('/user')
+
+            expect(mockUserRepository.getUserByOauthId).toHaveBeenCalledTimes(1)
+            expect(mockUserRepository.getUserByOauthId).toHaveBeenCalledWith('jwt_sub')
+
+            expect(response.status).toBe(200)
+            expect(response.body).toEqual({ id: 'user_id' })
+        })
+
+        it('should return 200 when calling user endpoint and user is not in local db', async () => {
+            mockUserRepository.getUserByOauthId.mockImplementation(() => Promise.reject(new UserNotFoundError()))
+            mockUserRepository.addUser.mockImplementation(() => Promise.resolve({ id: 'new_user_id' }))
+
+            const response = await request(app.callback()).get('/user')
+
+            expect(mockUserRepository.getUserByOauthId).toHaveBeenCalledTimes(1)
+            expect(mockUserRepository.getUserByOauthId).toHaveBeenCalledWith('jwt_sub')
+
+            expect(mockUserRepository.addUser).toHaveBeenCalledTimes(1)
+            expect(mockUserRepository.addUser).toHaveBeenCalledWith({ oauthId: 'jwt_sub' })
+
+            expect(response.status).toBe(200)
+            expect(response.body).toEqual({ id: 'new_user_id' })
+        })
+
+        it('should return 200 when calling user endpoint and db user fetch fails', async () => {
+            mockUserRepository.getUserByOauthId.mockImplementation(() => Promise.reject(new Error()))
+            mockUserRepository.addUser.mockImplementation(() => Promise.resolve({ id: 'new_user_id' }))
+
+            const response = await request(app.callback()).get('/user')
+
+            expect(mockUserRepository.getUserByOauthId).toHaveBeenCalledTimes(1)
+            expect(mockUserRepository.getUserByOauthId).toHaveBeenCalledWith('jwt_sub')
+
+            expect(mockUserRepository.addUser).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(500)
+        })
+    })
+
+    describe('get auth', function () {
+        it('should return 200 when getting auth message', async () => {
+            mockAuthRepository.getAuthMessage.mockImplementation(() => Promise.resolve({ test: true }))
+
+            const response = await request(app.callback()).get('/auth?wallet=test-wallet')
+
+            expect(mockAuthRepository.getAuthMessage).toHaveBeenCalledTimes(1)
+            expect(mockAuthRepository.getAuthMessage).toHaveBeenCalledWith('test-wallet')
+
+            expect(response.status).toBe(200)
+            expect(response.body).toEqual({ test: true })
+        })
+
+        it('should return 400 when getting auth message without wallet parameter', async () => {
+            const response = await request(app.callback()).get('/auth')
+
+            expect(mockAuthRepository.getAuthMessage).not.toHaveBeenCalled()
+
+            expect(response.status).toBe(400)
+            expect(response.body).toEqual({
+                error: 'MissingParameterError',
+                message: 'wallet must be specified'
             })
         })
     })

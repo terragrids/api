@@ -7,11 +7,11 @@ export default class Logger {
     }
 
     log(...params) {
-        (this.env === 'development' || this.env === 'local') && console.log(...params)
+        if (this.env === 'development' || this.env === 'local') console.log(...params)
     }
 
     info(...params) {
-        this.env !== 'test' && console.log(...params)
+        if (this.env !== 'test') console.log(...params)
     }
 
     error(...params) {

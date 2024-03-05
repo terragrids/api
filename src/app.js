@@ -14,11 +14,16 @@ import ApplicationStillRunningError from './error/application-still-running.erro
 import IpfsRepository from './repository/ipfs.repository.js'
 import S3Repository from './repository/s3.repository.js'
 import { filterAlgoAssetsByDbAssets, isValidAsset, TRBD, TRCL, TRLD } from './utils/assets.js'
-import { isNumber, isNumberOrUndef, isPositiveNumber } from './utils/validators.js'
+import { isNumberOrUndef, isPositiveNumber } from './utils/validators.js'
 import { TypePositiveNumberError } from './error/type-positive-number.error.js'
 import { TypeNumberError } from './error/type-number.error.js'
 import { NftTypeError } from './error/nft-type.error.js'
 import DynamoDbRepository from './repository/dynamodb.repository.js'
+import AuthRepository from './repository/auth.repository.js'
+import jwtAuthorize from './middleware/jwt-authorize.js'
+import UserRepository from './repository/user.repository.js'
+import MediaRepository from './repository/media.repository.js'
+import UserNotFoundError from './error/user-not-found.error.js'
 
 dotenv.config()
 export const app = new Koa()
@@ -36,6 +41,22 @@ router.get('/hc', async ctx => {
         ipfs: await new IpfsRepository().testConnection(),
         s3: await new S3Repository().testConnection()
     }
+})
+
+router.get('/user', jwtAuthorize, async ctx => {
+    const userRepository = new UserRepository()
+    let user
+    try {
+        user = await userRepository.getUserByOauthId(ctx.state.jwt.sub)
+    } catch (e) {
+        if (!(e instanceof UserNotFoundError)) throw e
+    }
+
+    if (!user) {
+        user = await userRepository.addUser({ oauthId: ctx.state.jwt.sub })
+    }
+
+    ctx.body = { ...user }
 })
 
 router.get('/terracells', async ctx => {
@@ -159,28 +180,21 @@ router.post('/nfts', bodyparser(), async ctx => {
         if (!power) throw new MissingParameterError('power')
         if (!isPositiveNumber(power)) throw new TypePositiveNumberError('power')
 
-        await new TokenRepository().putTrclToken({
+        await new TokenRepository().putToken({
             assetId: ctx.request.body.assetId,
-            symbol: ctx.request.body.symbol,
+            symbol,
             offchainUrl: ctx.request.body.offchainUrl,
-            power
-        })
-    } else if (symbol === TRLD) {
-        if (!isNumber(positionX)) throw new TypeNumberError('positionX')
-        if (!isNumber(positionY)) throw new TypeNumberError('positionY')
-
-        await new TokenRepository().putTrldToken({
-            assetId: ctx.request.body.assetId,
-            symbol: ctx.request.body.symbol,
-            offchainUrl: ctx.request.body.offchainUrl,
+            power,
             positionX,
             positionY
         })
-    } else if (symbol === TRBD) {
-        await new TokenRepository().putTrbdToken({
+    } else if (symbol === TRLD || symbol === TRBD) {
+        await new TokenRepository().putToken({
             assetId: ctx.request.body.assetId,
-            symbol: ctx.request.body.symbol,
-            offchainUrl: ctx.request.body.offchainUrl
+            symbol,
+            offchainUrl: ctx.request.body.offchainUrl,
+            positionX,
+            positionY
         })
     } else {
         throw new NftTypeError()
@@ -192,7 +206,11 @@ router.post('/nfts', bodyparser(), async ctx => {
 
 router.get('/nfts/:assetId', async ctx => {
     const algoIndexer = new AlgoIndexer()
-    const [assetResponse, balancesResponse, offchainInfo] = await Promise.all([algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}`), algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}/balances`), new TokenRepository().getToken(ctx.params.assetId)])
+    const [assetResponse, balancesResponse, offchainInfo] = await Promise.all([
+        algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}`),
+        algoIndexer.callAlgonodeIndexerEndpoint(`assets/${ctx.params.assetId}/balances?currency-greater-than=0`),
+        new TokenRepository().getToken(ctx.params.assetId)
+    ])
 
     if (!assetResponse || assetResponse.status !== 200 || !offchainInfo) {
         throw new AssetNotFoundError()
@@ -204,6 +222,7 @@ router.get('/nfts/:assetId', async ctx => {
                 id: asset.index,
                 name: asset.params.name,
                 symbol: asset.params['unit-name'],
+                reserve: asset.params.reserve,
                 url: asset.params.url,
                 ...offchainInfo,
                 holders: balances
@@ -218,24 +237,35 @@ router.get('/nfts/:assetId', async ctx => {
 })
 
 router.get('/nfts/type/:symbol', async ctx => {
-    const symbol = ctx.params.symbol.toUpperCase()
-    const response = await new AlgoIndexer().callRandLabsIndexerEndpoint(`assets?unit=${symbol}`)
+    const dbResponse = await new TokenRepository().getTokensBySymbol({
+        symbol: ctx.params.symbol.toUpperCase(),
+        projectId: ctx.request.query.projectId,
+        status: ctx.request.query.status,
+        sort: ctx.request.query.sort,
+        pageSize: ctx.request.query.pageSize,
+        nextPageKey: ctx.request.query.nextPageKey
+    })
 
-    const algoAssets = response.json.assets
-        .filter(asset => !asset.deleted && asset.params.total === 1 && asset.params.decimals === 0)
-        .map(asset => ({
-            id: asset.index,
-            name: asset.params.name,
-            symbol: asset.params['unit-name'],
-            url: asset.params.url
-        }))
+    const algoIndexer = new AlgoIndexer()
 
-    const tokenRepository = new TokenRepository()
-    const dbCalls = algoAssets.map(asset => tokenRepository.getToken(asset.id))
-    const dbAssets = await Promise.all(dbCalls)
+    const indexerCalls = dbResponse.assets.flatMap(asset => [algoIndexer.callAlgonodeIndexerEndpoint(`assets/${asset.id}`), algoIndexer.callAlgonodeIndexerEndpoint(`assets/${asset.id}/balances?currency-greater-than=0`)])
+    const indexerResults = await Promise.all(indexerCalls)
 
-    const assets = filterAlgoAssetsByDbAssets(algoAssets, dbAssets)
-    ctx.body = { assets }
+    const assets = dbResponse.assets.reduce((result, dbAsset, index) => {
+        const i = index * 2
+        if (indexerResults[i].status === 200 && !indexerResults[i].json.asset.deleted && indexerResults[i + 1].status === 200 && indexerResults[i + 1].json.balances)
+            result.push({
+                ...dbAsset,
+                name: indexerResults[i].json.asset.params.name,
+                holders: indexerResults[i + 1].json.balances.map(balance => ({ address: balance.address, amount: balance.amount }))
+            })
+        return result
+    }, [])
+
+    ctx.body = {
+        assets,
+        nextPageKey: dbResponse.nextPageKey
+    }
 })
 
 router.delete('/nfts/:assetId', async ctx => {
@@ -340,40 +370,96 @@ router.get('/accounts/:accountId/nfts/:symbol', async ctx => {
     ctx.body = { assets }
 })
 
-router.post('/ipfs/files', bodyparser(), async ctx => {
-    if (!ctx.request.body.assetName) throw new MissingParameterError('assetName')
-    if (!ctx.request.body.assetDescription) throw new MissingParameterError('assetDescription')
-    if (!ctx.request.body.fileName) throw new MissingParameterError('fileName')
-
-    const s3 = new S3Repository()
-    const ipfs = new IpfsRepository()
-
-    const s3Object = await s3.getFileReadStream(ctx.request.body.fileName)
-    const resultFile = await ipfs.pinFile(s3Object.fileStream)
-    const resultMeta = await ipfs.pinJson({
-        assetName: ctx.request.body.assetName,
-        assetDescription: ctx.request.body.assetDescription,
-        fileIpfsHash: resultFile.IpfsHash,
-        fileName: ctx.request.body.fileName,
-        fileMimetype: s3Object.contentType
-    })
-
-    ctx.body = {
-        assetName: resultMeta.assetName,
-        url: `ipfs://${resultMeta.IpfsHash}`,
-        integrity: resultMeta.integrity
-    }
-    ctx.status = 201
-})
-
-router.post('/files/upload', bodyparser(), async ctx => {
+/**
+ * Uploads files to S3
+ */
+router.post('/files/upload', jwtAuthorize, bodyparser(), async ctx => {
     if (!ctx.request.body.contentType) throw new MissingParameterError('contentType')
+    await new UserRepository().getUserByOauthId(ctx.state.jwt.sub)
     const response = await new S3Repository().getUploadSignedUrl(ctx.request.body.contentType)
     ctx.body = {
         id: response.id,
         url: response.url
     }
     ctx.status = 201
+})
+
+/**
+ * Transfers a file from S3 to IPFS and pins file and metadata
+ */
+router.post('/ipfs/files', jwtAuthorize, bodyparser(), async ctx => {
+    if (!ctx.request.body.name) throw new MissingParameterError('name')
+    if (!ctx.request.body.description) throw new MissingParameterError('description')
+    if (!ctx.request.body.properties) throw new MissingParameterError('properties')
+    if (!ctx.request.body.fileId) throw new MissingParameterError('fileId')
+
+    await new UserRepository().getUserByOauthId(ctx.state.jwt.sub)
+    const s3 = new S3Repository()
+    const ipfs = new IpfsRepository()
+
+    const s3Object = await s3.getFileReadStream(ctx.request.body.fileId)
+    const resultFile = await ipfs.pinFile(s3Object.fileStream, ctx.request.body.fileId, s3Object.contentLength)
+    const resultMeta = await ipfs.pinJson({
+        name: ctx.request.body.name,
+        description: ctx.request.body.description,
+        properties: ctx.request.body.properties,
+        fileIpfsHash: resultFile.hash,
+        fileMimetype: s3Object.contentType
+    })
+
+    ctx.body = {
+        name: resultMeta.name,
+        url: `ipfs://${resultMeta.hash}`,
+        integrity: resultMeta.integrity
+    }
+    ctx.status = 201
+})
+
+/**
+ * Pins new metadata files to IPFS referring to pre-loaded media files on S3 and IPFS
+ */
+router.post('/ipfs/metadata', jwtAuthorize, bodyparser(), async ctx => {
+    if (!ctx.request.body.name) throw new MissingParameterError('name')
+    if (!ctx.request.body.description) throw new MissingParameterError('description')
+    if (!ctx.request.body.properties) throw new MissingParameterError('properties')
+    if (!ctx.request.body.fileId) throw new MissingParameterError('fileId')
+
+    const [, s3Object, mediaItem] = await Promise.all([new UserRepository().getUserByOauthId(ctx.state.jwt.sub), new S3Repository().getFileMetadata(ctx.request.body.fileId), new MediaRepository().getMediaItem(ctx.request.body.fileId)])
+
+    const result = await new IpfsRepository().pinJson({
+        name: ctx.request.body.name,
+        description: ctx.request.body.description,
+        properties: ctx.request.body.properties,
+        fileIpfsHash: mediaItem.hash,
+        fileMimetype: s3Object.contentType
+    })
+
+    ctx.body = {
+        name: result.name,
+        url: `ipfs://${result.hash}`,
+        integrity: result.integrity
+    }
+    ctx.status = 201
+})
+
+router.get('/media/:type', async ctx => {
+    const media = await new MediaRepository().getMediaByType({
+        type: ctx.params.type,
+        rank: ctx.request.query.rank,
+        sort: ctx.request.query.sort,
+        pageSize: ctx.request.query.pageSize,
+        nextPageKey: ctx.request.query.nextPageKey
+    })
+    ctx.body = media
+    ctx.status = 200
+})
+
+router.get('/auth', async ctx => {
+    if (!ctx.request.query.wallet) throw new MissingParameterError('wallet')
+
+    const authMessage = await new AuthRepository().getAuthMessage(ctx.request.query.wallet)
+    ctx.body = authMessage
+    ctx.status = 200
 })
 
 app.use(requestLogger).use(errorHandler).use(router.routes()).use(router.allowedMethods())
